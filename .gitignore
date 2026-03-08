@@ -1,0 +1,7 @@
+# idea
+.idea
+.claude
+
+# dev
+node_modules
+main.js
