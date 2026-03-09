@@ -12,7 +12,7 @@ import {
   MarkdownView,
   Menu,
   Notice,
-  Plugin,
+  Plugin, setIcon,
   WorkspaceLeaf,
 } from "obsidian";
 
@@ -67,6 +67,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     // 4. Status bar widget.
     this.statusBarEl = this.addStatusBarItem();
+    this.statusBarEl.style.order = "999";
     this.statusBarEl.addClass("ml-status-bar");
     this.buildStatusBar();
 
@@ -84,7 +85,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     );
 
     // 8. Per-note frontmatter override — re-evaluate on file open.
-    //    Also re-filter the Outline panel for the newly active file.
+    //    Also, re-filter the Outline panel for the newly active file.
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf: WorkspaceLeaf | null) => {
         if (!leaf) return;
@@ -264,7 +265,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     // Globe / language icon
     const icon = wrapper.createSpan("ml-status-icon");
-    icon.textContent = "🌐";
+    setIcon(icon, "languages");
 
     // Current language label (clickable)
     const label = wrapper.createSpan("ml-status-label");
@@ -393,10 +394,9 @@ export default class MultilingualNotesPlugin extends Plugin {
       ? (this.settings.languages[0]?.code ?? "en")
       : this.settings.activeLanguage;
 
-    const snippet = `:::lang ${active}\n\n:::`;
+    const snippet = `[//]: # (lang ${active})\n\n[//]: # (endlang)`;
     const cursor = editor.getCursor();
     editor.replaceRange(snippet, cursor);
-    // Move cursor inside the block
     editor.setCursor({ line: cursor.line + 1, ch: 0 });
   }
 
@@ -410,15 +410,16 @@ export default class MultilingualNotesPlugin extends Plugin {
       ? (this.settings.languages[0]?.code ?? "en")
       : this.settings.activeLanguage;
 
-    editor.replaceSelection(`:::lang ${active}\n${selection}\n:::`);
+    editor.replaceSelection(`[//]: # (lang ${active})\n${selection}\n\n[//]: # (endlang)`);
   }
 
   private insertMultilingualTemplate(editor: Editor): void {
     const lines: string[] = [];
     for (const lang of this.settings.languages) {
-      lines.push(`:::lang ${lang.code}`);
+      lines.push(`[//]: # (lang ${lang.code})`);
       lines.push(`<!-- ${lang.label} content here -->`);
-      lines.push(":::");
+      lines.push("\n");
+      lines.push("[//]: # (endlang)");
       lines.push("");
     }
     const cursor = editor.getCursor();
@@ -437,23 +438,129 @@ export default class MultilingualNotesPlugin extends Plugin {
     new Notice(`Language: ${label}`);
   }
 
-  // ─── Editor context menu ────────────────────────────────────────────────
+// ─── Editor context menu ────────────────────────────────────────────────
 
   private addEditorContextMenuItems(menu: Menu, editor: Editor): void {
-    menu.addSeparator();
     menu.addItem((item) => {
       item
-        .setTitle("🌐 Wrap selection in language block")
-        .setIcon("languages")
-        .onClick(() => this.wrapSelectionInLangBlock(editor));
+          .setTitle("多语言")
+          .setIcon("languages");
+
+      const submenu = (item as any).setSubmenu() as Menu;
+
+      submenu.addItem((subItem) => {
+        subItem
+            .setTitle("包裹")
+            .setIcon("wrap-text")
+            .onClick(() => this.wrapSelectionInLangBlock(editor));
+      });
+
+      submenu.addItem((subItem) => {
+        subItem
+            .setTitle("智能插入")
+            .setIcon("sparkles")
+            .onClick(() => this.smartInsertLanguageBlock(editor));
+      });
+
+      submenu.addItem((subItem) => {
+        subItem
+            .setTitle("手动插入")
+            .setIcon("list");
+
+        const langSubmenu = (subItem as any).setSubmenu() as Menu;
+        const existingLanguages = this.detectExistingLanguages(editor);
+
+        for (const lang of this.settings.languages) {
+          const exists = existingLanguages.has(lang.code);
+          langSubmenu.addItem((langItem) => {
+            langItem.setTitle(lang.label);
+            if (exists) {
+              langItem.setDisabled(true);
+              setTimeout(() => {
+                const el = (langItem as any).dom as HTMLElement;
+                if (el) {
+                  el.style.opacity = "0.4";
+                  el.style.cursor = "not-allowed";
+                  const titleEl = el.querySelector(".menu-item-title");
+                  if (titleEl) titleEl.textContent = `✓ ${lang.label}`;
+                }
+              }, 0);
+            } else {
+              langItem.onClick(() => this.insertLangBlockForLanguage(editor, lang.code));
+            }
+          });
+        }
+      });
     });
-    menu.addItem((item) => {
-      item
-        .setTitle("🌐 Insert language block")
-        .setIcon("languages")
-        .onClick(() => this.insertLangBlock(editor));
-    });
+
+    setTimeout(() => {
+      const menuDom = (menu as any).dom as HTMLElement;
+      if (!menuDom) return;
+
+      const allItems = Array.from(menuDom.querySelectorAll<HTMLElement>(".menu-item"));
+
+      const ourItem = allItems.find(el =>
+          el.querySelector(".lucide-languages") ||
+          el.querySelector("[data-icon='languages']")
+      );
+      if (!ourItem) return;
+
+      const insertItem = allItems.find(el =>
+          el.querySelector(".lucide-list-plus") ||
+          el.querySelector("[data-icon='list-plus']")
+      );
+      if (!insertItem) return;
+
+      ourItem.remove();
+      insertItem.after(ourItem);
+    }, 0);
   }
+
+  private detectExistingLanguages(editor: Editor): Set<string> {
+    const content = editor.getValue();
+    const blocks = parseLangBlocks(content);
+    const existing = new Set<string>();
+
+    for (const block of blocks) {
+      // 支持多语言码（空格分隔）
+      const codes = block.langCode.split(/\s+/);
+      codes.forEach(code => existing.add(code));
+    }
+
+    return existing;
+  }
+
+  private smartInsertLanguageBlock(editor: Editor): void {
+    const existingLangs = this.detectExistingLanguages(editor);
+
+    const nextLang = this.settings.languages.find(
+        lang => !existingLangs.has(lang.code)
+    );
+
+    if (nextLang) {
+      this.insertLangBlockForLanguage(editor, nextLang.code);
+      new Notice(`Inserted ${nextLang.label} block`);
+    } else {
+      new Notice("✓ Fully internationalized", 3000);
+    }
+  }
+
+  private insertLangBlockForLanguage(editor: Editor, langCode: string): void {
+    const lastLine = editor.lastLine();
+    const lastLineContent = editor.getLine(lastLine);
+    const prefix = lastLineContent.trim() === "" ? "" : "\n";
+    const snippet = `${prefix}\n[//]: # (lang ${langCode})\n\n[//]: # (endlang)`;
+    const endPos = { line: lastLine, ch: lastLineContent.length };
+    editor.setCursor(endPos);
+    editor.replaceRange(snippet, endPos);
+    const contentLine = lastLine + (lastLineContent.trim() === "" ? 2 : 3);
+    editor.setCursor({ line: contentLine, ch: 0 });
+    editor.scrollIntoView(
+        { from: { line: contentLine, ch: 0 }, to: { line: contentLine, ch: 0 } },
+        true
+    );
+  }
+
 
   // ─── Frontmatter override ──────────────────────────────────────────────
 

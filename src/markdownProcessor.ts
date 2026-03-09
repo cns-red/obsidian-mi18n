@@ -46,28 +46,30 @@ interface SyntaxPattern {
   visible: boolean;
 }
 
+/**
+ * Capture groups are unified into one or multiple language codes,
+ * separated by spaces, such as "zh-CN" or "zh-CN en"
+ */
+const LANG_CODE_PART = `([\\w-]+(?:\\s+[\\w-]+)*)`;
+
 /** Open-block markers. Capture group 1 = language code. */
-const OPEN_PATTERNS: SyntaxPattern[] = [
-  // :::lang zh-cn  (default, native Obsidian/Markdown fenced-div style)
-  { re: /^:::lang\s+(\S+)\s*$/, visible: true },
-  // {% i8n zh-cn %}  (Hexo-style, case-insensitive)
-  { re: /^\{%-?\s*i8n\s+(\S+)\s*-?%\}$/i, visible: true },
-  // [//]: # (lang zh-cn)  — Markdown comment hack, already invisible
-  { re: /^\[\/\/\]:\s*#\s*\(lang\s+(\S+)[^)]*\)/i, visible: false },
-  // %% lang zh-cn %%  — Obsidian comment, already invisible
-  { re: /^%%\s*lang\s+(\S+)\s*%%$/, visible: false },
+const OPEN_PATTERNS: RegExp[] = [
+  // :::lang zh-CN  或  :::lang zh-CN en
+  new RegExp(`^:::lang\\s+${LANG_CODE_PART}\\s*$`),
+  // {% i8n zh-CN %}  或  {% i8n zh-CN en %}
+  new RegExp(`^\\{%\\s*i8n\\s+${LANG_CODE_PART}\\s*%\\}\\s*$`),
+  // [//]: # (lang zh-CN)  或  [//]: # (lang zh-CN en)
+  new RegExp(`^\\[//\\]:\\s*#\\s*\\(lang\\s+${LANG_CODE_PART}\\)\\s*$`),
+  // %% lang zh-CN %%  或  %% lang zh-CN en %%
+  new RegExp(`^%%\\s+lang\\s+${LANG_CODE_PART}\\s+%%\\s*$`),
 ];
 
 /** Close-block markers. */
-const CLOSE_PATTERNS: SyntaxPattern[] = [
-  // :::
-  { re: /^:::\s*$/, visible: true },
-  // {% endi8n %}
-  { re: /^\{%-?\s*endi8n\s*-?%\}$/i, visible: true },
-  // [//]: # (:::)
-  { re: /^\[\/\/\]:\s*#\s*\(:::\s*\)$/i, visible: false },
-  // %% ::: %%
-  { re: /^%%\s*:::\s*%%$/, visible: false },
+const CLOSE_PATTERNS: RegExp[] = [
+  /^:::\s*$/,                             // :::
+  /^\{%\s*endlang\s*%\}\s*$/,            // {% endlang %}
+  /^\[\/\/\]:\s*#\s*\(\s*endlang\s*\)\s*$/, // [//]: # (endlang)
+  /^%%\s+endlang\s+%%\s*$/,              // %% endlang %%
 ];
 
 // ── Internal data ────────────────────────────────────────────────────────────
@@ -103,58 +105,63 @@ export function clearBlockCache(): void {
 /**
  * Case-insensitive comparison for language codes.
  * "zh-CN", "zh-cn", "ZH-CN" all match each other.
+ * "zh-CN en" space style supports multiple languages, indicating that all multi-language versions are rendered from it.
  * This is critical: notes may use :::lang zh-cn while settings store "zh-CN".
  */
-export function langMatch(noteCode: string, activeCode: string): boolean {
-  return noteCode.toLowerCase() === activeCode.toLowerCase();
+export function langMatch(blockLang: string, active: string): boolean {
+  if (active === "ALL") return true;
+  return blockLang.split(/\s+/).some(code => code === active);
 }
 
 // ── Parsing ───────────────────────────────────────────────────────────────────
 
-function tryMatchOpen(line: string): { langCode: string; visible: boolean } | null {
-  const t = line.trim();
-  for (const pat of OPEN_PATTERNS) {
-    const m = t.match(pat.re);
-    if (m) return { langCode: m[1], visible: pat.visible };
+function matchOpen(line: string): string | null {
+  for (const re of OPEN_PATTERNS) {
+    const m = re.exec(line);
+    if (m) return m[1].trim();
   }
   return null;
 }
 
-function tryMatchClose(line: string): { visible: boolean } | null {
-  const trimmed = line.trim();
-  for (const pat of CLOSE_PATTERNS) {
-    if (pat.re.test(trimmed)) return { visible: pat.visible };
-  }
-  return null;
+function matchClose(line: string): boolean {
+  return CLOSE_PATTERNS.some(re => re.test(line));
 }
 
 export function parseLangBlocks(source: string): LangBlock[] {
   const lines = source.split("\n");
   const blocks: LangBlock[] = [];
-  let i = 0;
+  let openBlock: { langCode: string; openLine: number } | null = null;
 
-  while (i < lines.length) {
-    const openResult = tryMatchOpen(lines[i]);
-    if (openResult) {
-      const openLine = i;
-      const { langCode, visible: openVisible } = openResult;
-      let closeLine = -1;
-      let closeVisible = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
 
-      // Scan forward for the matching close marker.
-      for (let j = i + 1; j < lines.length; j++) {
-        const closeResult = tryMatchClose(lines[j]);
-        if (closeResult) {
-          closeLine = j;
-          closeVisible = closeResult.visible;
-          i = j; // continue outer loop after the close marker
-          break;
-        }
+    if (openBlock === null) {
+      const code = matchOpen(line);
+      if (code !== null) {
+        openBlock = { langCode: code, openLine: i };
       }
-
-      blocks.push({ langCode, openLine, openVisible, closeLine, closeVisible });
+    } else {
+      if (matchClose(line)) {
+        blocks.push({
+          langCode: openBlock.langCode,
+          openLine: openBlock.openLine,
+          closeLine: i,
+          openVisible: true,
+          closeVisible: true,
+        });
+        openBlock = null;
+      }
     }
-    i++;
+  }
+
+  if (openBlock) {
+    blocks.push({
+      langCode: openBlock.langCode,
+      openLine: openBlock.openLine,
+      openVisible: true,
+      closeVisible: true,
+      closeLine: -1,
+    });
   }
 
   return blocks;
@@ -241,8 +248,11 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
           if (!isActive) {
             el.style.display = "none";
           } else {
-            // Reset stale display:none left by a previous render pass.
             el.style.display = "";
+
+            if (block.closeLine >= 0 && lineEnd >= block.closeLine) {
+              removeCloseMarkerFromElement(el);
+            }
           }
           return;
         }
@@ -258,6 +268,43 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * 从已渲染的 HTMLElement 里剥离闭标记文本。
+ * 兼容 p / blockquote / h1-h6 / li / td 等所有块级元素。
+ */
+function removeCloseMarkerFromElement(el: HTMLElement): void {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const toRemove: Node[] = [];
+
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent?.trim() ?? "";
+    if (matchClose(text)) {
+      toRemove.push(node);
+    }
+  }
+
+  for (const node of toRemove) {
+    const parent = node.parentElement;
+    if (!parent) continue;
+
+    const siblings = Array.from(parent.childNodes).filter(
+        n => n !== node && n.textContent?.trim() !== ""
+    );
+    if (siblings.length === 0) {
+      parent.style.display = "none";
+    } else {
+      node.parentNode?.removeChild(node);
+    }
+  }
+
+  // 如果整个 el 现在是空的，也隐藏它
+  if (el.textContent?.trim() === "") {
+    el.style.display = "none";
+  }
+}
+
+
 function createBadge(langCode: string, plugin: MultilingualNotesPlugin): HTMLElement {
   // Case-insensitive lookup so "zh-cn" finds the entry stored as "zh-CN"
   const lang  = plugin.settings.languages.find((l) => langMatch(l.code, langCode));
@@ -270,4 +317,4 @@ function createBadge(langCode: string, plugin: MultilingualNotesPlugin): HTMLEle
 }
 
 // Export regex utilities so editorExtension can reuse them.
-export { tryMatchOpen, tryMatchClose };
+export { matchOpen, matchClose };
