@@ -3,7 +3,7 @@
   "name": "i8n",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Write multiple language versions of the same content in a single Markdown file with a global language switcher.",
+  "description": "Write multiple language versions of the same content in a single Markdown file, then switch the visible language globally.",
   "author": "Community Plugin",
   "authorUrl": "",
   "fundingUrl": "",
