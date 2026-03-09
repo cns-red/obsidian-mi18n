@@ -27,7 +27,7 @@ const dictionaries: Record<string, Messages> = {
 const localeFallbackMap: Record<string, AppLocale> = {
   [AppLocale.EN]: AppLocale.EN,
   [AppLocale.ZH_CN]: AppLocale.ZH_CN,
-  [AppLocale.ZH_TW]: AppLocale.EN,
+  [AppLocale.ZH_TW]: AppLocale.ZH_CN,
   [AppLocale.JA]: AppLocale.EN,
   [AppLocale.FR]: AppLocale.EN,
   [AppLocale.DE]: AppLocale.EN,
@@ -49,8 +49,10 @@ function normalizeLocale(locale: string | null | undefined): string {
 
   const lower = trimmed.toLowerCase();
   if (lower === "zh-cn") return AppLocale.ZH_CN;
+  if (lower === "zh-tw" || lower === "zh-hk") return AppLocale.ZH_CN;
 
-  const base = trimmed.split("-")[0];
+  const base = trimmed.split("-")[0].toLowerCase();
+  if (base === "zh") return AppLocale.ZH_CN;
   return localeFallbackMap[base] ?? AppLocale.EN;
 }
 
@@ -72,7 +74,8 @@ function interpolate(template: string, params?: Params): string {
 }
 
 export function initializeI18n(obsidianLocale?: string): void {
-  const preferred = normalizeLocale(obsidianLocale ?? (window.navigator?.language ?? AppLocale.EN));
+  const browserLocale = typeof window !== "undefined" ? window.navigator?.language : AppLocale.EN;
+  const preferred = normalizeLocale(obsidianLocale ?? browserLocale);
   currentLocale = localeFallbackMap[preferred] ?? AppLocale.EN;
 }
 

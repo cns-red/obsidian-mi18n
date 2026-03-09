@@ -45,7 +45,7 @@ const zhCN: MessagesShape = {
     show_badges_name: "阅读模式显示语言标签",
     show_badges_desc: "在阅读模式下为每个可见语言块显示一个小标签。",
     configured_languages_title: "已配置语言",
-    configured_languages_desc: "可新增、删除或重命名语言项。“code”必须与 lang 标记中的代码完全一致。",
+    configured_languages_desc: "可新增、删除或重命名语言项。语言代码匹配不区分大小写，但建议统一使用一种规范写法（例如 zh-CN）。",
     add_language_name: "新增语言",
     add_language_button: "+ 添加语言",
     syntax_title: "语法参考",

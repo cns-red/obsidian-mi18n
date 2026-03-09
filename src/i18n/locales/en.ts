@@ -45,7 +45,7 @@ const en = {
     show_badges_desc: "Display a small label above each visible language block in reading mode.",
     configured_languages_title: "Configured Languages",
     configured_languages_desc:
-      'Add, remove or rename language entries. The "code" must exactly match the code you use in your lang markers.',
+      'Add, remove or rename language entries. Language code matching is case-insensitive, but keeping one canonical form (for example zh-CN) is recommended.',
     add_language_name: "Add a new language",
     add_language_button: "+ Add language",
     syntax_title: "Syntax Reference",

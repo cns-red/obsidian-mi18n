@@ -43,19 +43,19 @@ This is the English version.
 ```md
 [//]: # (lang zh-CN)
 这是中文版本。
-[//]: # ()
+[//]: # (endlang)
 ```
 
 ```md
 %% lang zh-CN %%
 这是中文版本。
-%% end %%
+%% endlang %%
 ```
 
 Rules:
 - Opening and closing markers must be on separate lines with no leading spaces.
 - Text outside any language block is always visible.
-- Language code matching is case-sensitive.
+- Language code matching is case-insensitive.
 
 ### Obsidian 插件发布后的 README 页面说明
 

@@ -53,13 +53,13 @@ export const SYNTAX_EXAMPLES = [
   {
     titleKey: "settings.syntax.comment_title",
     open:  "[//]: # (lang zh-CN)",
-    close: "[//]: # ()",
+    close: "[//]: # (endlang)",
     noteKey: "settings.syntax.comment_note",
   },
   {
     titleKey: "settings.syntax.obsidian_comment_title",
     open:  "%% lang zh-CN %%",
-    close: "%% end %%",
+    close: "%% endlang %%",
     noteKey: "settings.syntax.obsidian_comment_note",
   },
 ] as const;
