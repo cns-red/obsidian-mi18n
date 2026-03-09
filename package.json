@@ -1,6 +1,9 @@
 {
   "name": "i8n",
   "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/cns-red/obsidian-i8n"
+  },
   "description": "Obsidian plugin for bilingual/multilingual writing in a single Markdown file",
   "main": "main.js",
   "scripts": {

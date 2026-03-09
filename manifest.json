@@ -3,9 +3,9 @@
   "name": "i8n",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Write multiple language versions of the same content in a single Markdown file, then switch the visible language globally.",
-  "author": "Community Plugin",
-  "authorUrl": "",
+  "description": "单稿多语言 Write multiple language versions of the same content in a single Markdown file, then switch the visible language globally.",
+  "author": "J.Knight",
+  "authorUrl": "https://log.cns.red",
   "fundingUrl": "",
   "isDesktopOnly": false
 }

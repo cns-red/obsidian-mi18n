@@ -1,0 +1,25 @@
+# .clinerules - Obsidian Plugin Project
+
+# Dependencies
+node_modules/
+.yarn/
+
+# Build outputs
+main.js
+styles.css
+manifest.json
+*.js.map
+*.d.ts
+
+# Development
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Git
+.git/
+
+# Keep these - they're source code
+!src/**/*.ts
+!src/**/*.css
