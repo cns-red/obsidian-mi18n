@@ -29,6 +29,7 @@ import {
   langMatch,
 } from "./src/markdownProcessor";
 import { buildEditorExtension, setActiveLangEffect } from "./src/editorExtension";
+import { initializeI18n, t } from "./src/i18n";
 
 export default class MultilingualNotesPlugin extends Plugin {
   settings!: MultilingualNotesSettings;
@@ -43,6 +44,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    initializeI18n((this.app as any)?.vault?.getConfig?.("locale"));
 
     // 1. Register the reading-mode post-processor.
     registerReadingModeProcessor(this);
@@ -58,7 +60,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     // 3. Ribbon icon — click opens a language-picker menu.
     this.ribbonEl = this.addRibbonIcon(
       "languages",
-      "Multilingual Notes — switch language",
+      t("ribbon.switch_language"),
       (evt: MouseEvent) => {
         this.showLanguageMenu(evt);
       }
@@ -270,7 +272,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     // Current language label (clickable)
     const label = wrapper.createSpan("ml-status-label");
     label.textContent = this.getActiveLabel();
-    label.setAttribute("title", "Click to switch language");
+    label.setAttribute("title", t("status_bar.click_to_switch"));
     label.style.cursor = "pointer";
 
     // Bug fix (Bug 3): using .onclick assignment instead of addEventListener
@@ -287,7 +289,7 @@ export default class MultilingualNotesPlugin extends Plugin {
   }
 
   private getActiveLabel(): string {
-    if (this.settings.activeLanguage === "ALL") return "All languages";
+    if (this.settings.activeLanguage === "ALL") return t("status_bar.all_languages");
     const lang = this.settings.languages.find(
       (l) => l.code === this.settings.activeLanguage
     );
@@ -301,7 +303,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     menu.addItem((item) => {
       item
-        .setTitle("Show all languages")
+        .setTitle(t("menu.show_all_languages"))
         .setChecked(this.settings.activeLanguage === "ALL")
         .onClick(async () => {
           await this.setActiveLanguage("ALL");
@@ -331,10 +333,10 @@ export default class MultilingualNotesPlugin extends Plugin {
     for (const lang of this.settings.languages) {
       this.addCommand({
         id: `switch-lang-${lang.code}`,
-        name: `Switch language: ${lang.label}`,
+        name: t("command.switch_language", { label: lang.label }),
         callback: async () => {
           await this.setActiveLanguage(lang.code);
-          new Notice(`Language switched to ${lang.label}`);
+          new Notice(t("notice.language_switched", { label: lang.label }));
         },
       });
     }
@@ -342,17 +344,17 @@ export default class MultilingualNotesPlugin extends Plugin {
     // Show all languages.
     this.addCommand({
       id: "switch-lang-ALL",
-      name: "Switch language: Show all languages",
+      name: t("command.switch_show_all"),
       callback: async () => {
         await this.setActiveLanguage("ALL");
-        new Notice("Showing all language blocks");
+        new Notice(t("notice.showing_all_blocks"));
       },
     });
 
     // Cycle through languages (keyboard-shortcut friendly).
     this.addCommand({
       id: "cycle-language",
-      name: "Cycle to next language",
+      name: t("command.cycle_next"),
       hotkeys: [{ modifiers: ["Alt"], key: "l" }],
       callback: async () => {
         await this.cycleLanguage();
@@ -362,7 +364,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     // Insert language block at cursor.
     this.addCommand({
       id: "insert-lang-block",
-      name: "Insert language block",
+      name: t("command.insert_lang_block"),
       editorCallback: (editor: Editor) => {
         this.insertLangBlock(editor);
       },
@@ -371,7 +373,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     // Wrap current selection in language block.
     this.addCommand({
       id: "wrap-selection-in-lang-block",
-      name: "Wrap selection in language block",
+      name: t("command.wrap_selection"),
       editorCallback: (editor: Editor) => {
         this.wrapSelectionInLangBlock(editor);
       },
@@ -380,7 +382,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     // Insert a full multilingual template.
     this.addCommand({
       id: "insert-multilingual-template",
-      name: "Insert multilingual block template (all languages)",
+      name: t("command.insert_template"),
       editorCallback: (editor: Editor) => {
         this.insertMultilingualTemplate(editor);
       },
@@ -403,7 +405,7 @@ export default class MultilingualNotesPlugin extends Plugin {
   private wrapSelectionInLangBlock(editor: Editor): void {
     const selection = editor.getSelection();
     if (!selection) {
-      new Notice("Select some text first.");
+      new Notice(t("notice.select_text_first"));
       return;
     }
     const active = this.settings.activeLanguage === "ALL"
@@ -435,7 +437,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       : codes[idx + 1];
     await this.setActiveLanguage(next);
     const label = this.settings.languages.find((l) => l.code === next)?.label ?? next;
-    new Notice(`Language: ${label}`);
+    new Notice(t("notice.current_language", { label }));
   }
 
 // ─── Editor context menu ────────────────────────────────────────────────
@@ -443,28 +445,28 @@ export default class MultilingualNotesPlugin extends Plugin {
   private addEditorContextMenuItems(menu: Menu, editor: Editor): void {
     menu.addItem((item) => {
       item
-          .setTitle("多语言")
+          .setTitle(t("menu.multilingual"))
           .setIcon("languages");
 
       const submenu = (item as any).setSubmenu() as Menu;
 
       submenu.addItem((subItem) => {
         subItem
-            .setTitle("包裹")
+            .setTitle(t("menu.wrap"))
             .setIcon("wrap-text")
             .onClick(() => this.wrapSelectionInLangBlock(editor));
       });
 
       submenu.addItem((subItem) => {
         subItem
-            .setTitle("智能插入")
+            .setTitle(t("menu.smart_insert"))
             .setIcon("sparkles")
             .onClick(() => this.smartInsertLanguageBlock(editor));
       });
 
       submenu.addItem((subItem) => {
         subItem
-            .setTitle("手动插入")
+            .setTitle(t("menu.manual_insert"))
             .setIcon("list");
 
         const langSubmenu = (subItem as any).setSubmenu() as Menu;
@@ -482,7 +484,7 @@ export default class MultilingualNotesPlugin extends Plugin {
                   el.style.opacity = "0.4";
                   el.style.cursor = "not-allowed";
                   const titleEl = el.querySelector(".menu-item-title");
-                  if (titleEl) titleEl.textContent = `✓ ${lang.label}`;
+                  if (titleEl) titleEl.textContent = t("menu.existing_lang_prefix", { label: lang.label });
                 }
               }, 0);
             } else {
@@ -539,9 +541,9 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     if (nextLang) {
       this.insertLangBlockForLanguage(editor, nextLang.code);
-      new Notice(`Inserted ${nextLang.label} block`);
+      new Notice(t("notice.inserted_block", { label: nextLang.label }));
     } else {
-      new Notice("✓ Fully internationalized", 3000);
+      new Notice(t("notice.fully_internationalized"), 3000);
     }
   }
 

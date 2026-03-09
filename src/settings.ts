@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type MultilingualNotesPlugin from "../main";
+import { t } from "./i18n";
 
 // ─── Data structures ───────────────────────────────────────────────────────
 
@@ -38,28 +39,28 @@ export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
 
 export const SYNTAX_EXAMPLES = [
   {
-    title: "Default (Obsidian fenced-div style)",
+    titleKey: "settings.syntax.default_title",
     open:  ":::lang zh-CN",
     close: ":::",
-    note:  "Recommended. Works natively in Obsidian and renders correctly in most Markdown previewers.",
+    noteKey: "settings.syntax.default_note",
   },
   {
-    title: "Hexo / template-tag style",
+    titleKey: "settings.syntax.hexo_title",
     open:  "{% i8n zh-CN %}",
     close: "{% endi8n %}",
-    note:  "Visible in reading mode. Compatible with Hexo and similar static-site generators.",
+    noteKey: "settings.syntax.hexo_note",
   },
   {
-    title: "Markdown comment (link-reference hack)",
+    titleKey: "settings.syntax.comment_title",
     open:  "[//]: # (lang zh-CN)",
     close: "[//]: # ()",
-    note:  "Completely invisible in Obsidian reading mode — ideal for clean documents. The lang code goes in the parentheses.",
+    noteKey: "settings.syntax.comment_note",
   },
   {
-    title: "Obsidian comment style",
+    titleKey: "settings.syntax.obsidian_comment_title",
     open:  "%% lang zh-CN %%",
     close: "%% end %%",
-    note:  "Completely invisible in Obsidian (comment syntax). Also hidden in Live Preview.",
+    noteKey: "settings.syntax.obsidian_comment_note",
   },
 ] as const;
 
@@ -77,14 +78,14 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "i8n — Settings" });
+    containerEl.createEl("h2", { text: t("settings.title") });
 
     // ── Active Language ──────────────────────────────────────────────────
     new Setting(containerEl)
-      .setName("Active language")
-      .setDesc("The language currently shown across all notes.")
+      .setName(t("settings.active_language_name"))
+      .setDesc(t("settings.active_language_desc"))
       .addDropdown((drop) => {
-        drop.addOption("ALL", "Show all languages");
+        drop.addOption("ALL", t("menu.show_all_languages"));
         for (const lang of this.plugin.settings.languages) {
           drop.addOption(lang.code, lang.label);
         }
@@ -96,11 +97,8 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
     // ── Default Language ─────────────────────────────────────────────────
     new Setting(containerEl)
-      .setName("Default language")
-      .setDesc(
-        "Language assumed when a note has no lang markers at all. " +
-        "Switching to any other language will make such notes invisible."
-      )
+      .setName(t("settings.default_language_name"))
+      .setDesc(t("settings.default_language_desc"))
       .addDropdown((drop) => {
         for (const lang of this.plugin.settings.languages) {
           drop.addOption(lang.code, lang.label);
@@ -114,12 +112,8 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
     // ── Hide in Editor ───────────────────────────────────────────────────
     new Setting(containerEl)
-      .setName("Hide other languages in editor")
-      .setDesc(
-        "When ON: non-active language blocks are collapsed to a thin bar in editing mode — " +
-        "you can only type in the current language. " +
-        "When OFF: all language blocks are shown normally in the editor so you can freely read and edit every translation."
-      )
+      .setName(t("settings.hide_other_name"))
+      .setDesc(t("settings.hide_other_desc"))
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.settings.hideInEditor);
         toggle.onChange(async (value) => {
@@ -131,8 +125,8 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
     // ── Language badges ──────────────────────────────────────────────────
     new Setting(containerEl)
-      .setName("Show language badges in reading mode")
-      .setDesc("Display a small label above each visible language block in reading mode.")
+      .setName(t("settings.show_badges_name"))
+      .setDesc(t("settings.show_badges_desc"))
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.settings.showLangBadges);
         toggle.onChange(async (value) => {
@@ -143,9 +137,9 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
       });
 
     // ── Language list ────────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: "Configured Languages" });
+    containerEl.createEl("h3", { text: t("settings.configured_languages_title") });
     containerEl.createEl("p", {
-      text: 'Add, remove or rename language entries. The "code" must exactly match the code you use in your lang markers.',
+      text: t("settings.configured_languages_desc"),
       cls: "setting-item-description",
     });
 
@@ -153,9 +147,9 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     this.renderLanguageList(listContainer);
 
     new Setting(containerEl)
-      .setName("Add a new language")
+      .setName(t("settings.add_language_name"))
       .addButton((btn) => {
-        btn.setButtonText("+ Add language").onClick(() => {
+        btn.setButtonText(t("settings.add_language_button")).onClick(() => {
           this.plugin.settings.languages.push({ code: "xx", label: "New Language" });
           this.plugin.saveSettings().then(() => {
             listContainer.empty();
@@ -165,9 +159,9 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
       });
 
     // ── Syntax Reference ─────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: "Syntax Reference" });
+    containerEl.createEl("h3", { text: t("settings.syntax_title") });
     containerEl.createEl("p", {
-      text: "All four syntaxes are equivalent. Choose the one that best fits your workflow.",
+      text: t("settings.syntax_desc"),
       cls: "setting-item-description",
     });
 
@@ -176,36 +170,33 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
       // Title + note
       const header = wrap.createDiv("ml-syntax-header");
-      header.createEl("strong", { text: ex.title });
-      header.createEl("span", { text: "  —  " + ex.note, cls: "ml-syntax-note" });
+      header.createEl("strong", { text: t(ex.titleKey) });
+      header.createEl("span", { text: "  —  " + t(ex.noteKey), cls: "ml-syntax-note" });
 
       // Code block
       const pre = wrap.createEl("pre", { cls: "ml-syntax-code" });
       const langCode = this.plugin.settings.languages[0]?.code ?? "zh-CN";
-      const sample = `${ex.open.replace("zh-CN", langCode)}\n内容 / Content\n${ex.close}`;
+      const sample = `${ex.open.replace("zh-CN", langCode)}\n${t("settings.syntax_sample_content")}\n${ex.close}`;
       pre.createEl("code", { text: sample });
 
       // Copy button
       const copyBtn = wrap.createEl("button", {
-        text: "Copy",
+        text: t("settings.copy"),
         cls: "ml-syntax-copy-btn",
       });
       copyBtn.addEventListener("click", () => {
         navigator.clipboard.writeText(sample).then(() => {
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+          copyBtn.textContent = t("settings.copied");
+          setTimeout(() => { copyBtn.textContent = t("settings.copy"); }, 1500);
         });
       });
     }
 
     // ── Tip: no-marker notes ─────────────────────────────────────────────
     const tipBox = containerEl.createDiv("ml-tip-box");
-    tipBox.createEl("strong", { text: "💡 Notes without any lang markers" });
+    tipBox.createEl("strong", { text: t("settings.no_marker_title") });
     tipBox.createEl("p", {
-      text:
-        "A note that contains no lang markers is treated as being written entirely " +
-        "in the Default Language above. Switching to a different language will make the " +
-        "whole note invisible — this is intentional, since the note has no translation for that language.",
+      text: t("settings.no_marker_desc"),
     });
   }
 
@@ -216,7 +207,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
       const row = new Setting(container)
         .addText((text) => {
           text
-            .setPlaceholder("code, e.g. zh-CN")
+            .setPlaceholder(t("settings.code_placeholder"))
             .setValue(lang.code)
             .onChange(async (value) => {
               this.plugin.settings.languages[index].code = value.trim();
@@ -227,7 +218,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
         })
         .addText((text) => {
           text
-            .setPlaceholder("label, e.g. 简体中文")
+            .setPlaceholder(t("settings.label_placeholder"))
             .setValue(lang.label)
             .onChange(async (value) => {
               this.plugin.settings.languages[index].label = value;
@@ -239,11 +230,11 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
         .addButton((btn) => {
           btn
             .setIcon("trash")
-            .setTooltip("Remove this language")
+            .setTooltip(t("settings.remove_language_tooltip"))
             .setClass("mod-warning")
             .onClick(async () => {
               if (this.plugin.settings.languages.length <= 1) {
-                new Notice("You must keep at least one language.");
+                new Notice(t("notice.keep_one_language"));
                 return;
               }
               this.plugin.settings.languages.splice(index, 1);
@@ -257,7 +248,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
               this.plugin.refreshStatusBar();
             });
         });
-      row.setName(`Language #${index + 1}`);
+      row.setName(t("settings.language_row", { index: index + 1 }));
     });
   }
 }
