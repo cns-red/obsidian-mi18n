@@ -26,9 +26,9 @@ import {
   registerReadingModeProcessor,
   clearBlockCache,
   parseLangBlocks,
-  langMatch,
 } from "./src/markdownProcessor";
 import { buildEditorExtension, setActiveLangEffect } from "./src/editorExtension";
+import { langMatch } from "./src/syntax";
 import { initializeI18n, t } from "./src/i18n";
 
 export default class MultilingualNotesPlugin extends Plugin {

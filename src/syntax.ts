@@ -39,3 +39,12 @@ export function isLanguageBlockClose(line: string): boolean {
   return CLOSE_PATTERNS.some((re) => re.test(text));
 }
 
+/**
+ * Case-insensitive language matching.
+ * Supports space-separated marker codes like "en zh-CN".
+ */
+export function langMatch(blockLang: string, active: string): boolean {
+  if (active === "ALL") return true;
+  const activeNorm = active.toLowerCase();
+  return blockLang.split(/\s+/).some((code) => code.toLowerCase() === activeNorm);
+}

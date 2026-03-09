@@ -9,7 +9,11 @@
 
 import { MarkdownPostProcessorContext } from "obsidian";
 import type MultilingualNotesPlugin from "../main";
-import { isLanguageBlockClose, matchLanguageBlockOpen } from "./syntax";
+import {
+  isLanguageBlockClose,
+  langMatch,
+  matchLanguageBlockOpen,
+} from "./syntax";
 
 // ── Marker parsing uses shared helpers in src/syntax.ts ────────────────
 
@@ -50,18 +54,6 @@ export function clearBlockCache(): void {
 }
 
 // ── Language code helpers ─────────────────────────────────────────────────────
-
-/**
- * Case-insensitive comparison for language codes.
- * "zh-CN", "zh-cn", "ZH-CN" all match each other.
- * "zh-CN en" space style supports multiple languages, indicating that all multi-language versions are rendered from it.
- * This is critical: notes may use :::lang zh-cn while settings store "zh-CN".
- */
-export function langMatch(blockLang: string, active: string): boolean {
-  if (active === "ALL") return true;
-  const activeNorm = active.toLowerCase();
-  return blockLang.split(/\s+/).some((code) => code.toLowerCase() === activeNorm);
-}
 
 // ── Parsing ───────────────────────────────────────────────────────────────────
 
