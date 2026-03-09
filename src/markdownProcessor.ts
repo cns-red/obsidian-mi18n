@@ -25,6 +25,12 @@ export interface LangBlock {
   closeLine: number;
   /** Whether the close marker renders visibly. */
   closeVisible: boolean;
+
+  // Exact character offsets for text injection/extraction:
+  start: number;
+  innerStart: number;
+  innerEnd: number;
+  end: number;
 }
 
 function isVisibleMarkerLine(line: string): boolean {
@@ -67,15 +73,23 @@ export function langMatch(blockLang: string, active: string): boolean {
 export function parseLangBlocks(source: string): LangBlock[] {
   const lines = source.split("\n");
   const blocks: LangBlock[] = [];
-  let openBlock: { langCode: string; openLine: number } | null = null;
+  let openBlock: { langCode: string; openLine: number; start: number; innerStart: number } | null = null;
+
+  let currentOffset = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const lineLengthWithNewline = line.length + (i < lines.length - 1 ? 1 : 0);
 
     if (openBlock === null) {
       const code = matchLanguageBlockOpen(line);
       if (code !== null) {
-        openBlock = { langCode: code, openLine: i };
+        openBlock = {
+          langCode: code,
+          openLine: i,
+          start: currentOffset,
+          innerStart: currentOffset + lineLengthWithNewline
+        };
       }
     } else {
       if (isLanguageBlockClose(line)) {
@@ -85,10 +99,15 @@ export function parseLangBlocks(source: string): LangBlock[] {
           closeLine: i,
           openVisible: isVisibleMarkerLine(lines[openBlock.openLine]),
           closeVisible: isVisibleMarkerLine(line),
+          start: openBlock.start,
+          innerStart: openBlock.innerStart,
+          innerEnd: currentOffset,
+          end: currentOffset + lineLengthWithNewline
         });
         openBlock = null;
       }
     }
+    currentOffset += lineLengthWithNewline;
   }
 
   if (openBlock) {
@@ -98,6 +117,10 @@ export function parseLangBlocks(source: string): LangBlock[] {
       openVisible: isVisibleMarkerLine(lines[openBlock.openLine]),
       closeVisible: true,
       closeLine: -1,
+      start: openBlock.start,
+      innerStart: openBlock.innerStart,
+      innerEnd: source.length,
+      end: source.length
     });
   }
 
@@ -252,7 +275,7 @@ function ensureLangHeader(
   // Collect unique language codes present in this document.
   const langCodes = new Set<string>();
   for (const block of blocks) {
-    block.langCode.split(/\s+/).filter(Boolean).forEach((c) => langCodes.add(c));
+    block.langCode.split(/\s+/).filter(Boolean).forEach((c) => langCodes.add(c.toLowerCase()));
   }
 
   const existing = owner.querySelector(".ml-lang-header");

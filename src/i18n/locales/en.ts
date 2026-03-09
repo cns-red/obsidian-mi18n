@@ -12,6 +12,7 @@ const en = {
     wrap: "Wrap",
     smart_insert: "Smart insert",
     manual_insert: "Manual insert",
+    smart_translate: "Smart AI translate",
     existing_lang_prefix: "✓ {label}",
   },
   command: {
@@ -31,6 +32,8 @@ const en = {
     inserted_block: "Inserted {label} block",
     fully_internationalized: "✓ Fully internationalized",
     keep_one_language: "You must keep at least one language.",
+    api_key_missing: "API Key is not configured. Please go to settings first.",
+    empty_insertion: "Cannot insert empty text.",
   },
   settings: {
     title: "i8n — Settings",
@@ -65,6 +68,19 @@ const en = {
     code_placeholder: "code, e.g. zh-CN",
     label_placeholder: "label, e.g. 简体中文",
     syntax_sample_content: "内容 / Content",
+    ai_translation_title: "AI Translation",
+    ai_api_base_name: "API Base URL",
+    ai_api_base_desc: "The base URL for the OpenAI-compatible API (e.g. OpenAI, Ollama, OpenRouter).",
+    ai_api_key_name: "API Key",
+    ai_api_key_desc: "Your API key for the chosen service.",
+    ai_model_name: "Model",
+    ai_model_desc: "The AI model to use (e.g. gpt-4o-mini).",
+    ai_system_prompt_name: "System Prompt",
+    ai_system_prompt_desc: "The underlying instruction sent to the AI. Adjust if translations are behaving weirdly.",
+    source_language: "Source Language",
+    source_language_desc: "Select the existing language block to translate.",
+    target_language: "Target Language",
+    target_language_desc: "Select the language to generate a new block for.",
     syntax: {
       default_title: "Default (Obsidian fenced-div style)",
       default_note: "Recommended. Works natively in Obsidian and renders correctly in most Markdown previewers.",
@@ -76,6 +92,21 @@ const en = {
       obsidian_comment_title: "Obsidian comment style",
       obsidian_comment_note: "Completely invisible in Obsidian (comment syntax). Also hidden in Live Preview.",
     },
+  },
+  button: {
+    add: "+ Add",
+    remove: "Remove",
+    translate: "Translate",
+    cancel: "Cancel",
+    insert: "Insert",
+    translating: "Translating...",
+    regenerate: "Regenerate",
+  },
+  label: {
+    preview_edit: "Preview & Edit Text",
+  },
+  placeholder: {
+    translation_preview: "Click Translate to generate text. You can edit the result here before inserting.",
   },
 } as const;
 

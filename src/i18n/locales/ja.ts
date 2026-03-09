@@ -12,6 +12,7 @@ const ja = {
         wrap: "言語ブロックで囲む",
         smart_insert: "次の言語ブロックをスマート挿入",
         manual_insert: "言語ブロックを手動で挿入",
+        smart_translate: "スマート AI 翻訳",
         existing_lang_prefix: "✓ {label}",
     },
     command: {
@@ -65,6 +66,15 @@ const ja = {
         code_placeholder: "コード、例：ja",
         label_placeholder: "ラベル、例：日本語",
         syntax_sample_content: "内容 / Content",
+        ai_translation_title: "AI スマート翻訳",
+        ai_api_base_name: "API Base URL",
+        ai_api_base_desc: "OpenAI 互換の API ベース URL。",
+        ai_api_key_name: "API Key",
+        ai_api_key_desc: "選択したサービスの API キー。",
+        ai_model_name: "Model",
+        ai_model_desc: "翻訳に使用する AI モデル（例：gpt-4o-mini 等）。",
+        ai_system_prompt_name: "System Prompt",
+        ai_system_prompt_desc: "AI に送信される基本命令。",
         syntax: {
             default_title: "デフォルト（Obsidian fenced-div スタイル）",
             default_note: "推奨。Obsidianでネイティブに動作し、ほとんどのプレビューアで互換性があります。",

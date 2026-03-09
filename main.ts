@@ -31,6 +31,7 @@ import {
 import { buildStatusBar, showLanguageMenu } from "./src/ui/statusBar";
 import { applyOutlineFilter, ensureOutlineControl } from "./src/ui/outlineFilter";
 import { resolveFrontmatterLanguage } from "./src/language-state/frontmatter";
+import { TranslationModal } from "./src/ui/translationModal";
 
 export default class MultilingualNotesPlugin extends Plugin {
   settings!: MultilingualNotesSettings;
@@ -162,7 +163,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       const blocks = parseLangBlocks(text);
       const presentCodes = new Set<string>();
       for (const block of blocks) {
-        block.langCode.split(/\s+/).filter(Boolean).forEach((c) => presentCodes.add(c));
+        block.langCode.split(/\s+/).filter(Boolean).forEach((c) => presentCodes.add(c.toLowerCase()));
       }
 
       ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
@@ -255,6 +256,12 @@ export default class MultilingualNotesPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "smart-translate",
+      name: t("menu.smart_translate"),
+      editorCallback: (editor: Editor) => this.openTranslationModal(editor),
+    });
+
+    this.addCommand({
       id: "insert-multilingual-template",
       name: t("command.insert_template"),
       editorCallback: (editor: Editor) => this.insertMultilingualTemplate(editor),
@@ -300,6 +307,10 @@ export default class MultilingualNotesPlugin extends Plugin {
             new Notice(t("notice.select_text_first"));
           }
         });
+      });
+
+      submenu.addItem((subItem) => {
+        subItem.setTitle(t("menu.smart_translate")).setIcon("bot").onClick(() => this.openTranslationModal(editor));
       });
 
       submenu.addItem((subItem) => {
@@ -350,7 +361,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     const blocks = parseLangBlocks(editor.getValue());
     const existing = new Set<string>();
     for (const block of blocks) {
-      block.langCode.split(/\s+/).forEach((code) => existing.add(code));
+      block.langCode.split(/\s+/).forEach((code) => existing.add(code.toLowerCase()));
     }
     return existing;
   }
@@ -364,6 +375,55 @@ export default class MultilingualNotesPlugin extends Plugin {
     } else {
       new Notice(t("notice.fully_internationalized"), 3000);
     }
+  }
+
+  private openTranslationModal(editor: Editor): void {
+    const text = editor.getValue();
+    const cursor = editor.getCursor();
+    const cursorOffset = editor.posToOffset(cursor);
+    const blocks = parseLangBlocks(text);
+
+    let activeBlock = blocks.find((b) => cursorOffset >= b.start && cursorOffset <= b.end);
+    let sourceContent = "";
+    let activeLangCode = "";
+
+    if (activeBlock) {
+      sourceContent = text.slice(activeBlock.innerStart, activeBlock.innerEnd);
+      activeLangCode = activeBlock.langCode.split(/\s+/)[0].toLowerCase();
+    } else {
+      // If not in a block, try to guess the active language, or just use the first block found
+      if (blocks.length > 0) {
+        activeBlock = blocks[0];
+        sourceContent = text.slice(activeBlock.innerStart, activeBlock.innerEnd);
+        activeLangCode = activeBlock.langCode.split(/\s+/)[0].toLowerCase();
+      }
+    }
+
+    if (!sourceContent.trim() && blocks.length === 0) {
+      new Notice("Cannot translate empty note without language blocks.");
+      return;
+    }
+
+    const existingLanguages = this.detectExistingLanguages(editor);
+    const modal = new TranslationModal(this.app, this, sourceContent, activeLangCode, existingLanguages);
+    modal.onInsertCallback = (translatedText, targetLangCode) => {
+      // Find where to insert. We can use the end of the active block.
+      const pos = editor.offsetToPos(activeBlock!.end);
+      let insertionContent = `\n\n:::lang ${targetLangCode}\n${translatedText}\n:::`;
+
+      // Attempt to guess the boundary syntax based on the source block if possible
+      const sourceOpenTag = text.slice(activeBlock!.start, activeBlock!.innerStart).trim();
+      if (sourceOpenTag.startsWith("[//]:")) {
+        insertionContent = `\n\n[//]: # (lang ${targetLangCode})\n${translatedText}\n[//]: # (endlang)`;
+      } else if (sourceOpenTag.startsWith("{%")) {
+        insertionContent = `\n\n{% i8n ${targetLangCode} %}\n${translatedText}\n{% endi8n %}`;
+      } else if (sourceOpenTag.startsWith("%%")) {
+        insertionContent = `\n\n%% lang ${targetLangCode} %%\n${translatedText}\n%% end %%`;
+      }
+
+      editor.replaceRange(insertionContent, pos);
+    };
+    modal.open();
   }
 
   private applyFrontmatterOverride(leaf: WorkspaceLeaf): void {

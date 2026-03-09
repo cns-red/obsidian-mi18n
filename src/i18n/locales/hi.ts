@@ -12,6 +12,7 @@ const hi = {
         wrap: "भाषा ब्लॉक में लपेटें",
         smart_insert: "स्मार्ट इंसर्ट",
         manual_insert: "मैन्युअल इंसर्ट",
+        smart_translate: "स्मार्ट AI अनुवाद",
         existing_lang_prefix: "✓ {label}",
     },
     command: {
@@ -65,6 +66,15 @@ const hi = {
         code_placeholder: "कोड (जैसे hi)",
         label_placeholder: "लेबल (जैसे हिन्दी)",
         syntax_sample_content: "सामग्री / Content",
+        ai_translation_title: "AI अनुवाद",
+        ai_api_base_name: "API Base URL",
+        ai_api_base_desc: "OpenAI-संगत API के लिए बेस URL।",
+        ai_api_key_name: "API Key",
+        ai_api_key_desc: "आपकी API कुंजी।",
+        ai_model_name: "Model",
+        ai_model_desc: "अनुवाद के लिए AI मॉडल (जैसे gpt-4o-mini)।",
+        ai_system_prompt_name: "System Prompt",
+        ai_system_prompt_desc: "AI को भेजे जाने वाले सिस्टम निर्देश।",
         syntax: {
             default_title: "डिफ़ॉल्ट (Obsidian ब्लॉक)",
             default_note: "अनुशंसित। Obsidian में बहुत अच्छे से काम करता है।",

@@ -24,21 +24,36 @@ export interface MultilingualNotesSettings {
   showRibbon: boolean;
   /** Show the active-language indicator in the bottom status bar */
   showStatusBar: boolean;
+
+  // ─── AI Translation ─────────────────────────────────────────────────────────
+  /** OpenAI-compatible API base URL */
+  aiApiBase: string;
+  /** API Key for the AI service */
+  aiApiKey: string;
+  /** AI Model to use for translation */
+  aiModel: string;
+  /** System prompt for the translation task */
+  aiSystemPrompt: string;
 }
 
 export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
   activeLanguage: "en",
   languages: [
     { code: "zh-CN", label: "简体中文" },
-    { code: "en",    label: "English"  },
-    { code: "ja",    label: "日本語"   },
-    { code: "fr",    label: "Français" },
+    { code: "en", label: "English" },
+    { code: "ja", label: "日本語" },
+    { code: "fr", label: "Français" },
   ],
   defaultLanguage: "en",
   hideInEditor: true,
   showLangHeader: true,
   showRibbon: true,
   showStatusBar: true,
+
+  aiApiBase: "https://api.openai.com/v1",
+  aiApiKey: "",
+  aiModel: "gpt-4o-mini",
+  aiSystemPrompt: "You are an expert translator. Translate the provided Markdown text into the target language. Output ONLY the translated text, block for block, preserving all Markdown formatting, frontmatter, and code blocks exactly. Do not add any conversational filler or explain your translation.",
 };
 
 // ─── Syntax examples (shown in settings UI and README) ─────────────────────
@@ -46,25 +61,25 @@ export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
 export const SYNTAX_EXAMPLES = [
   {
     titleKey: "settings.syntax.default_title",
-    open:  ":::lang zh-CN",
+    open: ":::lang zh-CN",
     close: ":::",
     noteKey: "settings.syntax.default_note",
   },
   {
     titleKey: "settings.syntax.hexo_title",
-    open:  "{% i8n zh-CN %}",
+    open: "{% i8n zh-CN %}",
     close: "{% endi8n %}",
     noteKey: "settings.syntax.hexo_note",
   },
   {
     titleKey: "settings.syntax.comment_title",
-    open:  "[//]: # (lang zh-CN)",
+    open: "[//]: # (lang zh-CN)",
     close: "[//]: # ()",
     noteKey: "settings.syntax.comment_note",
   },
   {
     titleKey: "settings.syntax.obsidian_comment_title",
-    open:  "%% lang zh-CN %%",
+    open: "%% lang zh-CN %%",
     close: "%% end %%",
     noteKey: "settings.syntax.obsidian_comment_note",
   },
@@ -230,6 +245,64 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     tipBox.createEl("p", {
       text: t("settings.no_marker_desc"),
     });
+
+    // ── AI Translation ───────────────────────────────────────────────────
+    containerEl.createEl("h2", { text: t("settings.ai_translation_title") });
+
+    new Setting(containerEl)
+      .setName(t("settings.ai_api_base_name"))
+      .setDesc(t("settings.ai_api_base_desc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("https://api.openai.com/v1")
+          .setValue(this.plugin.settings.aiApiBase)
+          .onChange(async (value) => {
+            this.plugin.settings.aiApiBase = value.trim() || "https://api.openai.com/v1";
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t("settings.ai_api_key_name"))
+      .setDesc(t("settings.ai_api_key_desc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("sk-...")
+          .setValue(this.plugin.settings.aiApiKey)
+          .onChange(async (value) => {
+            this.plugin.settings.aiApiKey = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.type = "password";
+      });
+
+    new Setting(containerEl)
+      .setName(t("settings.ai_model_name"))
+      .setDesc(t("settings.ai_model_desc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("gpt-4o-mini")
+          .setValue(this.plugin.settings.aiModel)
+          .onChange(async (value) => {
+            this.plugin.settings.aiModel = value.trim() || "gpt-4o-mini";
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t("settings.ai_system_prompt_name"))
+      .setDesc(t("settings.ai_system_prompt_desc"))
+      .addTextArea((text) => {
+        text
+          .setPlaceholder("You are an expert translator...")
+          .setValue(this.plugin.settings.aiSystemPrompt)
+          .onChange(async (value) => {
+            this.plugin.settings.aiSystemPrompt = value;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.rows = 4;
+        text.inputEl.style.width = "100%";
+      });
   }
 
   private renderLanguageList(container: HTMLElement): void {

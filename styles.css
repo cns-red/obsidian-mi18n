@@ -178,6 +178,143 @@
   border-top: none;
 }
 
+/* ── AI Translation Modal (Glassmorphism & Elegance) ────────────── */
+
+.ml-translation-modal-window.modal-container {
+  /* Increase dimensions subtly */
+  width: 90vw;
+  max-width: 650px;
+  height: 80vh;
+  max-height: 850px;
+}
+
+.ml-translation-modal.modal {
+  /* Glassmorphism setup */
+  background: var(--background-primary);
+  background: rgba(var(--background-primary-rgb, 255, 255, 255), 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Inner spacing */
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; /* Hide modal scrollbar to handle it internally */
+}
+
+/* Dark mode overrides for Glassmorphism */
+.theme-dark .ml-translation-modal.modal {
+  background: rgba(30, 30, 30, 0.7);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.ml-translation-modal h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 24px;
+  text-align: center;
+  color: var(--text-normal);
+  letter-spacing: -0.01em;
+}
+
+.ml-translation-modal h4 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Make setting rows sleeker */
+.ml-translation-modal .setting-item {
+  border: none;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(var(--background-modifier-border-rgb, 0, 0, 0), 0.05);
+}
+.theme-dark .ml-translation-modal .setting-item {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+.ml-translate-btn-row {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
+.ml-translate-btn-row .mod-cta {
+  font-size: 1.1em;
+  padding: 8px 32px;
+  height: auto;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 0,0,0), 0.2);
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.ml-translate-btn-row .mod-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(var(--interactive-accent-rgb, 0,0,0), 0.3);
+}
+
+/* Preview text area container */
+.ml-translation-preview {
+  flex-grow: 1; /* Take up remaining space */
+  display: flex;
+  flex-direction: column;
+  min-height: 200px; /* Ensure a minimum reasonable height */
+  margin-bottom: 16px;
+}
+
+.ml-translation-preview textarea {
+  flex-grow: 1;
+  width: 100%;
+  resize: none; 
+  font-family: var(--font-text);
+  font-size: 1.1em;
+  line-height: 1.6;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--background-primary-alt);
+  background: rgba(var(--background-primary-alt-rgb, 250,250,250), 0.5);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow-y: auto;
+}
+
+.theme-dark .ml-translation-preview textarea {
+    background: rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.ml-translation-preview textarea:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 0,0,0), 0.2), inset 0 2px 6px rgba(0,0,0,0.02);
+  outline: none;
+}
+
+.ml-action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: auto; /* Push to bottom */
+}
+
+.ml-action-row button {
+  border-radius: 8px;
+  padding: 6px 20px;
+  font-weight: 500;
+}
+
 /* ── Reading mode: hide the fence markers ─────────────────────────────── */
 /* (These are handled inline via style.display = "none" in the processor,
     but we add a class-based fallback here for robustness.) */

@@ -12,6 +12,7 @@ const fr = {
         wrap: "Envelopper avec le bloc",
         smart_insert: "Insertion intelligente",
         manual_insert: "Insertion manuelle",
+        smart_translate: "Traduction intelligente IA",
         existing_lang_prefix: "✓ {label}",
     },
     command: {
@@ -65,6 +66,15 @@ const fr = {
         code_placeholder: "code (ex: fr)",
         label_placeholder: "nom (ex: Français)",
         syntax_sample_content: "Contenu / Content",
+        ai_translation_title: "Traduction IA",
+        ai_api_base_name: "API Base URL",
+        ai_api_base_desc: "L'URL de base pour l'API compatible avec OpenAI.",
+        ai_api_key_name: "API Key",
+        ai_api_key_desc: "Votre clé API pour le service.",
+        ai_model_name: "Model",
+        ai_model_desc: "Le modèle d'IA à utiliser (ex: gpt-4o-mini).",
+        ai_system_prompt_name: "System Prompt",
+        ai_system_prompt_desc: "Les instructions sous-jacentes envoyées à l'IA.",
         syntax: {
             default_title: "Standard (style div d'Obsidian)",
             default_note: "Recommandé. Fonctionne nativement dans Obsidian et avec la plupart des lecteurs Markdown.",

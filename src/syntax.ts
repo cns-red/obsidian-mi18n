@@ -41,7 +41,7 @@ export function isLanguageBlockClose(line: string): boolean {
 
 export function buildCommentLangBlock(langCode: string, body = ""): string {
   const content = body.length > 0 ? `\n${body}\n` : "\n\n";
-  return `${COMMENT_OPEN_PREFIX}${langCode})${content}${COMMENT_CLOSE_MARKER}`;
+  return `${COMMENT_OPEN_PREFIX}${langCode})${content}\n${COMMENT_CLOSE_MARKER}`;
 }
 
 export function langCodeIncludes(blockLang: string, active: string): boolean {

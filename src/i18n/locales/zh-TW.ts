@@ -12,6 +12,7 @@ const zhTW = {
         wrap: "包裹為語言塊",
         smart_insert: "智能插入下一個語言塊",
         manual_insert: "手動插入語言塊",
+        smart_translate: "智能 AI 翻譯",
         existing_lang_prefix: "✓ {label}",
     },
     command: {
@@ -31,6 +32,8 @@ const zhTW = {
         inserted_block: "已插入 {label} 語言塊",
         fully_internationalized: "✓ 當前筆記已包含所有配置的語言",
         keep_one_language: "至少需要保留一種語言配置",
+        api_key_missing: "未配置 API 金鑰，請先前往設定中配置。",
+        empty_insertion: "無法插入空白文本。",
     },
     settings: {
         title: "多語言筆記 — 設置",
@@ -65,6 +68,19 @@ const zhTW = {
         code_placeholder: "代碼，例如 zh-TW",
         label_placeholder: "顯示名稱，例如 繁體中文",
         syntax_sample_content: "內容 / Content",
+        ai_translation_title: "AI 智能翻譯",
+        ai_api_base_name: "API Base URL / 接口地址",
+        ai_api_base_desc: "兼容 OpenAI 格式的 API 請求地址。",
+        ai_api_key_name: "API Key / 密鑰",
+        ai_api_key_desc: "你所選擇的 AI 服務的 API 密鑰。",
+        ai_model_name: "Model / 模型名稱",
+        ai_model_desc: "用來進行翻譯的 AI 模型（例如：gpt-4o-mini 等）。",
+        ai_system_prompt_name: "System Prompt / 系統提示詞",
+        ai_system_prompt_desc: "發送給模型的底層設定指令。",
+        source_language: "Source Language / 來源預言",
+        source_language_desc: "選擇要翻譯的現有語言區塊。",
+        target_language: "Target Language / 目標語言",
+        target_language_desc: "選擇要生成新語言區塊的語種。",
         syntax: {
             default_title: "默認 Markdown 區塊語法",
             default_note: "推薦。在 Obsidian 及大多數外部 Markdown 預覽器中兼容性最好",
@@ -75,6 +91,21 @@ const zhTW = {
             obsidian_comment_title: "Obsidian 原生註釋語法",
             obsidian_comment_note: "利用原生註釋語法在源代碼及實時預覽模式完全隱藏",
         },
+    },
+    button: {
+        add: "+ 添加",
+        remove: "移除",
+        translate: "翻譯",
+        cancel: "取消",
+        insert: "插入",
+        translating: "翻譯中...",
+        regenerate: "重新生成",
+    },
+    label: {
+        preview_edit: "預覽與編輯",
+    },
+    placeholder: {
+        translation_preview: "點擊翻譯按鈕生成文本。您可以在插入前在此處檢查和編輯結果。",
     },
 } as const;
 

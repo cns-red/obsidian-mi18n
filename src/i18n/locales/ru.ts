@@ -12,6 +12,7 @@ const ru = {
         wrap: "Обернуть в языковой блок",
         smart_insert: "Умная вставка блока",
         manual_insert: "Вставить вручную",
+        smart_translate: "Умный AI-перевод",
         existing_lang_prefix: "✓ {label}",
     },
     command: {
@@ -65,6 +66,15 @@ const ru = {
         code_placeholder: "код (например, ru)",
         label_placeholder: "название (например, Русский)",
         syntax_sample_content: "Текст / Content",
+        ai_translation_title: "AI Перевод",
+        ai_api_base_name: "API Base URL",
+        ai_api_base_desc: "Базовый URL для API, совместимого с OpenAI.",
+        ai_api_key_name: "API Key",
+        ai_api_key_desc: "Ваш API ключ.",
+        ai_model_name: "Model",
+        ai_model_desc: "Модель ИИ для перевода (например, gpt-4o-mini).",
+        ai_system_prompt_name: "System Prompt",
+        ai_system_prompt_desc: "Системные инструкции для ИИ.",
         syntax: {
             default_title: "Стандартный (стиль блоков Obsidian)",
             default_note: "Рекомендуется. Собственный формат Obsidian.",
