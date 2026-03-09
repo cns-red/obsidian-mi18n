@@ -42,6 +42,7 @@ export function ensureOutlineControl(
   outlineLeaves: WorkspaceLeaf[],
   settings: MultilingualNotesSettings,
   onSwitch: (code: string) => void,
+  presentCodes?: Set<string>,
 ): void {
   for (const leaf of outlineLeaves) {
     const containerEl = leaf.view.containerEl;
@@ -49,16 +50,27 @@ export function ensureOutlineControl(
     // Remove stale bar so active-pill state is always fresh.
     containerEl.querySelector(".ml-outline-lang-bar")?.remove();
 
+    if (presentCodes && presentCodes.size === 0) {
+      // If we know exactly what's present and there's nothing, hide the bar.
+      continue;
+    }
+
     const bar = document.createElement("div");
     bar.className = "ml-outline-lang-bar";
 
     const active = settings.activeLanguage;
 
     // ALL pill
-    bar.appendChild(createOutlinePill("ALL", "ALL", active === "ALL", onSwitch));
+    if (!presentCodes || presentCodes.size > 1) {
+      bar.appendChild(createOutlinePill("ALL", "ALL", active === "ALL", onSwitch));
+    }
 
-    // One pill per configured language
-    for (const lang of settings.languages) {
+    // One pill per configured language that is actually present
+    const codesToRender = presentCodes
+      ? settings.languages.filter(l => Array.from(presentCodes).some(pc => pc.toLowerCase() === l.code.toLowerCase()))
+      : settings.languages;
+
+    for (const lang of codesToRender) {
       bar.appendChild(
         createOutlinePill(lang.code, lang.label, active === lang.code, onSwitch),
       );

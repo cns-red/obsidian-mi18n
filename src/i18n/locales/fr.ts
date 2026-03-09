@@ -1,0 +1,81 @@
+const fr = {
+    ribbon: {
+        switch_language: "Notes Multilingues — changer de langue",
+    },
+    status_bar: {
+        click_to_switch: "Cliquez pour changer de langue",
+        all_languages: "Toutes les langues",
+    },
+    menu: {
+        show_all_languages: "Afficher toutes les langues",
+        multilingual: "Multilingue",
+        wrap: "Envelopper avec le bloc",
+        smart_insert: "Insertion intelligente",
+        manual_insert: "Insertion manuelle",
+        existing_lang_prefix: "✓ {label}",
+    },
+    command: {
+        switch_language: "Changer de langue : {label}",
+        switch_show_all: "Changer de langue : Afficher tout",
+        cycle_next: "Passer à la langue suivante",
+        insert_lang_block: "Insérer un bloc de langue",
+        smart_insert: "Insertion intelligente d'un bloc de langue",
+        wrap_selection: "Envelopper la sélection",
+        insert_template: "Insérer le modèle (toutes les langues)",
+    },
+    notice: {
+        language_switched: "Langue remplacée par {label}",
+        showing_all_blocks: "Affichage de tous les blocs de langue",
+        select_text_first: "Veuillez d'abord sélectionner du texte.",
+        current_language: "Langue actuelle : {label}",
+        inserted_block: "Bloc {label} inséré",
+        fully_internationalized: "✓ Entièrement internationalisé",
+        keep_one_language: "Vous devez conserver au moins une langue.",
+    },
+    settings: {
+        title: "i8n — Paramètres",
+        active_language_name: "Langue active",
+        active_language_desc: "Langue actuellement affichée sur toutes les notes.",
+        default_language_name: "Langue par défaut",
+        default_language_desc:
+            "Langue par défaut lorsqu'une note n'a aucun marqueur. Si vous passez à une autre langue, cette note sera masquée.",
+        hide_other_name: "Masquer les autres langues dans l'éditeur",
+        hide_other_desc:
+            "Activé : les blocs de langue inactifs sont réduits dans l'éditeur. Désactivé : tous les blocs s'affichent normalement dans l'éditeur.",
+        show_lang_header_name: "Sélecteur de langue en mode lecture",
+        show_lang_header_desc: "Affiche une barre de sélection de langue en haut de chaque note en mode lecture.",
+        show_ribbon_name: "Afficher l'icône dans la barre latérale",
+        show_ribbon_desc: "Affiche le bouton de sélection de langue dans le ruban.",
+        show_status_bar_name: "Indicateur dans la barre d'état",
+        show_status_bar_desc: "Affiche la langue active dans la barre d'état en bas à droite.",
+        configured_languages_title: "Langues configurées",
+        configured_languages_desc:
+            "Ajoutez, supprimez ou modifiez des langues. Le « code » doit correspondre à celui que vous utilisez dans vos marqueurs.",
+        add_language_name: "Ajouter une nouvelle langue",
+        add_language_button: "+ Ajouter une langue",
+        syntax_title: "Référence syntaxique",
+        syntax_desc: "Les 4 syntaxes sont équivalentes. Choisissez celle qui vous convient le mieux.",
+        copy: "Copier",
+        copied: "Copié !",
+        no_marker_title: "💡 Notes sans marqueur de langue",
+        no_marker_desc:
+            "Une note sans aucun marqueur de langue est considérée comme étant rédigée dans la Langue par défaut. Le passage à une autre langue la masquera complètement.",
+        language_row: "Langue #{index}",
+        remove_language_tooltip: "Supprimer cette langue",
+        code_placeholder: "code (ex: fr)",
+        label_placeholder: "nom (ex: Français)",
+        syntax_sample_content: "Contenu / Content",
+        syntax: {
+            default_title: "Standard (style div d'Obsidian)",
+            default_note: "Recommandé. Fonctionne nativement dans Obsidian et avec la plupart des lecteurs Markdown.",
+            hexo_title: "Hexo / balise template",
+            hexo_note: "Visible en lecture. Compatible avec Hexo et générateurs similaires.",
+            comment_title: "Commentaire Markdown (hack d'URL)",
+            comment_note: "Complètement invisible en mode lecture. Le code de langue entre parenthèses.",
+            obsidian_comment_title: "Commentaire natif Obsidian",
+            obsidian_comment_note: "Invisible dans Obsidian en mode lecture et en Live Preview.",
+        },
+    },
+} as const;
+
+export default fr;

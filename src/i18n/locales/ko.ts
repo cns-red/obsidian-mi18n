@@ -1,0 +1,82 @@
+const ko = {
+    ribbon: {
+        switch_language: "다국어 노트 — 언어 전환",
+    },
+    status_bar: {
+        click_to_switch: "클릭하여 언어 전환",
+        all_languages: "모든 언어",
+    },
+    menu: {
+        show_all_languages: "모든 언어 표시",
+        multilingual: "다국어 설정",
+        wrap: "언어 블록으로 감싸기",
+        smart_insert: "스마트 언어 블록 삽입",
+        manual_insert: "수동 언어 블록 삽입",
+        existing_lang_prefix: "✓ {label}",
+    },
+    command: {
+        switch_language: "언어 전환: {label}",
+        switch_show_all: "언어 전환: 모든 언어 표시",
+        cycle_next: "다음 언어로 반복 전환",
+        insert_lang_block: "언어 블록 삽입",
+        smart_insert: "스마트 언어 블록 삽입",
+        wrap_selection: "선택 영역을 언어 블록으로 감싸기",
+        insert_template: "다국어 템플릿 삽입 (모든 설정 언어)",
+    },
+    notice: {
+        language_switched: "{label}(으)로 전환됨",
+        showing_all_blocks: "모든 언어 블록 표시 중",
+        select_text_first: "먼저 텍스트를 선택하십시오.",
+        current_language: "현재 언어: {label}",
+        inserted_block: "{label} 블록 삽입됨",
+        fully_internationalized: "✓ 다국어화 완료",
+        keep_one_language: "최소 하나의 언어를 유지해야 합니다.",
+    },
+    settings: {
+        title: "i8n — 설정",
+        active_language_name: "현재 활성 언어",
+        active_language_desc: "모든 노트에 기본으로 표시되는 언어입니다.",
+        default_language_name: "기본 언어",
+        default_language_desc:
+            "언어 마커가 없는 노트는 이 언어로 작성된 것으로 처리됩니다. 다른 언어로 전환하면 해당 노트가 숨겨집니다.",
+        hide_other_name: "편집기에서 다른 언어 숨기기",
+        hide_other_desc:
+            "켜기: 편집 모드에서 현재 언어가 아닌 콘텐츠가 접혀집니다. 끄기: 편집기에 모든 언어의 소스 코드가 표시됩니다.",
+        show_lang_header_name: "읽기 모드 상단에 언어 선택기 표시",
+        show_lang_header_desc: "읽기 모드일 때 다국어 노트 상단에 언어 선택 막대를 자동으로 추가합니다.",
+        show_ribbon_name: "리본 아이콘 표시",
+        show_ribbon_desc: "왼쪽 사이드바 리본에 언어 전환 버튼을 표시합니다.",
+        show_status_bar_name: "상태 표시줄 표시기 표시",
+        show_status_bar_desc: "오른쪽 하단 상태 표시줄에 현재 활성화된 언어를 표시합니다.",
+        configured_languages_title: "설정된 언어",
+        configured_languages_desc:
+            "언어 항목을 추가, 삭제 또는 수정합니다. '코드'는 마커에서 사용하는 코드와 지확히 일치해야 합니다.",
+        add_language_name: "새 언어 추가",
+        add_language_button: "+ 추가",
+        syntax_title: "구문 참조",
+        syntax_desc: "4가지 구문은 모두 동일하게 작동합니다. 워크플로우에 가장 적합한 것을 선택하세요.",
+        copy: "복사",
+        copied: "복사됨!",
+        no_marker_title: "💡 언어 마커가 없는 노트",
+        no_marker_desc:
+            "언어 마커가 없는 노트는 위에 설정된 '기본 언어'로 작성된 것으로 간주됩니다. 다른 언어로 전환하면 해당 번역이 없기 때문에 노트 전체가 숨겨집니다.",
+        language_row: "언어 #{index}",
+        remove_language_tooltip: "이 언어 제거",
+        code_placeholder: "코드 (예: ko)",
+        label_placeholder: "레이블 (예: 한국어)",
+        syntax_sample_content: "내용 / Content",
+        syntax: {
+            default_title: "기본값 (Obsidian fenced-div 스타일)",
+            default_note: "권장. Obsidian에서 기본적으로 작동하며 대부분의 Markdown 미리보기와 호환됩니다.",
+            hexo_title: "Hexo / 템플릿 태그 스타일",
+            hexo_note: "읽기 모드에서 표시됩니다. Hexo 및 유사한 정적 사이트 생성기와 호환됩니다.",
+            comment_title: "Markdown 주석 (링크 참조 꼼수)",
+            comment_note:
+                "읽기 모드에서 완전히 숨겨지며 깔끔한 문서를 유지할 수 있습니다. 괄호 안에 언어 코드를 적습니다.",
+            obsidian_comment_title: "Obsidian 주석 스타일",
+            obsidian_comment_note: "Obsidian에서 완전히 숨어집니다 (주석 구문 사용). Live Preview에서도 숨겨집니다.",
+        },
+    },
+} as const;
+
+export default ko;

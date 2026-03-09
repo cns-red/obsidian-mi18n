@@ -1,0 +1,81 @@
+const zhTW = {
+    ribbon: {
+        switch_language: "多語筆記 — 切換語言",
+    },
+    status_bar: {
+        click_to_switch: "點擊切換語言",
+        all_languages: "所有語言",
+    },
+    menu: {
+        show_all_languages: "顯示所有語言",
+        multilingual: "多語言配置",
+        wrap: "包裹為語言塊",
+        smart_insert: "智能插入下一個語言塊",
+        manual_insert: "手動插入語言塊",
+        existing_lang_prefix: "✓ {label}",
+    },
+    command: {
+        switch_language: "切換語言：{label}",
+        switch_show_all: "切換語言：顯示所有語言",
+        cycle_next: "循環切換到下一個語言",
+        insert_lang_block: "插入語言塊",
+        smart_insert: "智能插入下一個語言塊",
+        wrap_selection: "將選中內容包裹為語段塊",
+        insert_template: "插入多語段模板 (包含所有配置語種)",
+    },
+    notice: {
+        language_switched: "已切換至 {label}",
+        showing_all_blocks: "顯示所有語言內容",
+        select_text_first: "請先選中一些文本",
+        current_language: "當前語言：{label}",
+        inserted_block: "已插入 {label} 語言塊",
+        fully_internationalized: "✓ 當前筆記已包含所有配置的語言",
+        keep_one_language: "至少需要保留一種語言配置",
+    },
+    settings: {
+        title: "多語言筆記 — 設置",
+        active_language_name: "當前激活語言",
+        active_language_desc: "所有筆記默認顯示的語言",
+        default_language_name: "默認缺省語言",
+        default_language_desc:
+            "如果一篇筆記沒有任何語言標籤，它將被視為以此默認語言編寫。切換到其他語言時這些筆記將自動隱藏",
+        hide_other_name: "編輯時隱藏非當前語言的多語段",
+        hide_other_desc:
+            "開啟時：在編輯模式中，非當前激活語言的內容將被摺疊收起。關閉時：始終顯示所有語言的源碼",
+        show_lang_header_name: "閱讀模式頂部多語切換欄",
+        show_lang_header_desc: "在閱讀模式下，自動為雙語/多語筆記頂部添加語言選擇欄",
+        show_ribbon_name: "顯示側邊欄圖標",
+        show_ribbon_desc: "在左側工具欄顯示語言切換按鈕",
+        show_status_bar_name: "顯示狀態欄提醒",
+        show_status_bar_desc: "在右下角狀態欄顯示當前激活的語言",
+        configured_languages_title: "語言配置",
+        configured_languages_desc:
+            '添加、刪除或修改你需要的語言。"語言代碼"必須與你在筆記中使用的標籤（marker）完全一致',
+        add_language_name: "添加新語言",
+        add_language_button: "+ 添加",
+        syntax_title: "語法參考",
+        syntax_desc: "以下四種語法效果完全相同，請選擇最符合你寫作習慣的一種。",
+        copy: "複製",
+        copied: "已複製！",
+        no_marker_title: "💡 關於沒有任何語言標籤的純文本筆記",
+        no_marker_desc:
+            "如果一篇筆記完全沒有使用任何標籤，插件會默認它是使用你設置的「缺省語言」編寫的。也就是說，當你切換到其他語言時，這些純單語筆記會自動隱藏，因為它們本身就沒有提供對應的翻譯版本。",
+        language_row: "語言 #{index}",
+        remove_language_tooltip: "刪除此語言",
+        code_placeholder: "代碼，例如 zh-TW",
+        label_placeholder: "顯示名稱，例如 繁體中文",
+        syntax_sample_content: "內容 / Content",
+        syntax: {
+            default_title: "默認 Markdown 區塊語法",
+            default_note: "推薦。在 Obsidian 及大多數外部 Markdown 預覽器中兼容性最好",
+            hexo_title: "Hexo / 博客模板語法",
+            hexo_note: "在閱讀模式下可見，兼容 Hexo 博客等靜態站點生成工具",
+            comment_title: "Markdown 註釋語法（鏈接欺騙法）",
+            comment_note: "在閱讀模式下完全隱藏，保持文檔整潔。請將語言代碼寫在括號內",
+            obsidian_comment_title: "Obsidian 原生註釋語法",
+            obsidian_comment_note: "利用原生註釋語法在源代碼及實時預覽模式完全隱藏",
+        },
+    },
+} as const;
+
+export default zhTW;

@@ -115,7 +115,7 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       if (!info) return; // Can't determine position → leave untouched.
 
       const { text: source, lineStart, lineEnd } = info;
-      const active      = plugin.settings.activeLanguage;
+      const active = plugin.settings.activeLanguage;
       const defaultLang = plugin.settings.defaultLanguage;
       const showLangHeader = plugin.settings.showLangHeader;
 
@@ -172,7 +172,7 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
         }
 
         // ③ This element is INSIDE the block (between open and close).
-        const afterOpen   = lineStart > block.openLine;
+        const afterOpen = lineStart > block.openLine;
         const beforeClose = block.closeLine < 0 || lineStart < block.closeLine;
         if (afterOpen && beforeClose) {
           const isActive = active === "ALL" || langMatch(block.langCode, active);
@@ -220,7 +220,7 @@ function removeCloseMarkerFromElement(el: HTMLElement): void {
     if (!parent) continue;
 
     const siblings = Array.from(parent.childNodes).filter(
-        n => n !== node && n.textContent?.trim() !== ""
+      n => n !== node && n.textContent?.trim() !== ""
     );
     if (siblings.length === 0) {
       parent.style.display = "none";
@@ -248,19 +248,60 @@ function ensureLangHeader(
 ): void {
   const owner = el.closest(".markdown-preview-sizer") ?? el.parentElement;
   if (!owner) return;
-  if (owner.querySelector(".ml-lang-header")) return;
 
   // Collect unique language codes present in this document.
   const langCodes = new Set<string>();
   for (const block of blocks) {
     block.langCode.split(/\s+/).filter(Boolean).forEach((c) => langCodes.add(c));
   }
-  if (langCodes.size === 0) return;
+
+  const existing = owner.querySelector(".ml-lang-header");
+  if (langCodes.size === 0) {
+    existing?.remove();
+    return;
+  }
+
+  const active = plugin.settings.activeLanguage;
+
+  if (existing) {
+    // Check if languages match. If so, just update active states.
+    const pills = Array.from(existing.querySelectorAll(".ml-lang-pill"));
+    const existingCodes = new Set(pills.map(p => p.getAttribute("data-lang")).filter(Boolean) as string[]);
+
+    const expectedCodes = new Set(langCodes);
+    if (langCodes.size > 1) expectedCodes.add("ALL");
+
+    let match = existingCodes.size === expectedCodes.size;
+    if (match) {
+      for (const code of expectedCodes) {
+        if (!existingCodes.has(code)) {
+          match = false;
+          break;
+        }
+      }
+    }
+
+    if (match) {
+      // Just update active highlights
+      pills.forEach((pill) => {
+        const code = pill.getAttribute("data-lang");
+        if (!code) return;
+        const isActive = (active === "ALL") ? code === "ALL" : active.toLowerCase() === code.toLowerCase();
+        if (isActive) {
+          pill.classList.add("ml-lang-pill--active");
+        } else {
+          pill.classList.remove("ml-lang-pill--active");
+        }
+      });
+      positionHeader(existing as HTMLElement, owner);
+      return;
+    } else {
+      existing.remove();
+    }
+  }
 
   const header = document.createElement("div");
   header.className = "ml-lang-header";
-
-  const active = plugin.settings.activeLanguage;
 
   // ALL pill — always present when there are multiple language codes.
   if (langCodes.size > 1) {
@@ -281,7 +322,32 @@ function ensureLangHeader(
     );
   }
 
-  owner.prepend(header);
+  positionHeader(header, owner);
+}
+
+function positionHeader(header: HTMLElement, owner: Element) {
+  // Insert right below frontmatter or title if possible
+  const frontmatter = owner.querySelector(".frontmatter-container, .metadata-container");
+  if (frontmatter) {
+    const wrap = frontmatter.closest(".markdown-preview-section");
+    const target = (wrap && wrap.parentElement === owner) ? wrap : frontmatter;
+    if (header.previousElementSibling !== target) {
+      target.after(header);
+    }
+  } else {
+    const title = owner.querySelector(".mod-header, .inline-title");
+    if (title) {
+      const wrap = title.closest(".markdown-preview-section");
+      const target = (wrap && wrap.parentElement === owner) ? wrap : title;
+      if (header.previousElementSibling !== target) {
+        target.after(header);
+      }
+    } else {
+      if (owner.firstElementChild !== header) {
+        owner.prepend(header);
+      }
+    }
+  }
 }
 
 function createHeaderPill(

@@ -1,0 +1,82 @@
+const ja = {
+    ribbon: {
+        switch_language: "多言語ノート — 言語を切り替える",
+    },
+    status_bar: {
+        click_to_switch: "クリックして言語を切り替える",
+        all_languages: "すべての言語",
+    },
+    menu: {
+        show_all_languages: "すべての言語を表示",
+        multilingual: "多言語設定",
+        wrap: "言語ブロックで囲む",
+        smart_insert: "次の言語ブロックをスマート挿入",
+        manual_insert: "言語ブロックを手動で挿入",
+        existing_lang_prefix: "✓ {label}",
+    },
+    command: {
+        switch_language: "言語を切り替える：{label}",
+        switch_show_all: "言語を切り替える：すべての言語を表示",
+        cycle_next: "次の言語にサイクル切り替え",
+        insert_lang_block: "言語ブロックを挿入",
+        smart_insert: "言語ブロックをスマート挿入",
+        wrap_selection: "選択範囲を言語ブロックで囲む",
+        insert_template: "多言語テンプレートを挿入（全言語）",
+    },
+    notice: {
+        language_switched: "{label} に切り替えました",
+        showing_all_blocks: "すべての言語コンテンツを表示",
+        select_text_first: "先にテキストを選択してください。",
+        current_language: "現在の言語：{label}",
+        inserted_block: "{label} ブロックを挿入しました",
+        fully_internationalized: "✓ 完全な多言語化が完了しました",
+        keep_one_language: "言語は最低でも一つ必要です。",
+    },
+    settings: {
+        title: "i8n — 設定",
+        active_language_name: "現在のアクティブな言語",
+        active_language_desc: "すべてのノートでデフォルト表示される言語。",
+        default_language_name: "デフォルト言語",
+        default_language_desc:
+            "マーカーが一切ないノートはこの言語で書かれていると見なされます。別の言語に切り替えると、そのようなノートは非表示になります。",
+        hide_other_name: "エディターで他の言語を非表示にする",
+        hide_other_desc:
+            "オンの場合：現在のアクティブな言語以外のコンテンツはエディターで折りたたまれます。オフの場合：すべての言語のソースコードがエディターに表示されます。",
+        show_lang_header_name: "読書モードの上部に言語スイッチャーを表示",
+        show_lang_header_desc: "読書モードの際、多言語ノートの上部に言語選択バーを自動追加します。",
+        show_ribbon_name: "リボンアイコンを表示",
+        show_ribbon_desc: "左側のサイドバーに言語切り替えボタンを表示します。",
+        show_status_bar_name: "ステータスバーのアクティブ言語を表示",
+        show_status_bar_desc: "右下のステータスバーに現在アクティブな言語を表示します。",
+        configured_languages_title: "設定済みの言語",
+        configured_languages_desc:
+            "言語エントリーを追加、削除、または変更します。「コード」はマーカーで使用するコードと完全に一致する必要があります。",
+        add_language_name: "新しい言語を追加",
+        add_language_button: "+ 追加",
+        syntax_title: "構文リファレンス",
+        syntax_desc: "4つの構文はすべて同等です。ワークフローに最適なものを選択してください。",
+        copy: "コピー",
+        copied: "コピーしました！",
+        no_marker_title: "💡 言語マーカーのないノートについて",
+        no_marker_desc:
+            "言語マーカーが一切ないノートは、上記のデフォルト言語だけで書かれているとして扱われます。したがって、別の言語に切り替えた場合、そのノートには翻訳が存在しないため、ノート全体が非表示になります。",
+        language_row: "言語 #{index}",
+        remove_language_tooltip: "この言語を削除",
+        code_placeholder: "コード、例：ja",
+        label_placeholder: "ラベル、例：日本語",
+        syntax_sample_content: "内容 / Content",
+        syntax: {
+            default_title: "デフォルト（Obsidian fenced-div スタイル）",
+            default_note: "推奨。Obsidianでネイティブに動作し、ほとんどのプレビューアで互換性があります。",
+            hexo_title: "Hexo / テンプレートタグ スタイル",
+            hexo_note: "読書モードで可視。Hexoなどの静的サイトジェネレーターと互換性があります。",
+            comment_title: "Markdown コメント（リンク参照の手法）",
+            comment_note:
+                "プレビューで完全に非表示になり、クリーンな文書が作成できます。カッコ内に言語コードを記載します。",
+            obsidian_comment_title: "Obsidian コメント スタイル",
+            obsidian_comment_note: "Obsidianで完全に非表示（コメント構文用）。Live Previewでも非表示。",
+        },
+    },
+} as const;
+
+export default ja;

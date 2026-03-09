@@ -1,0 +1,81 @@
+const ru = {
+    ribbon: {
+        switch_language: "Многоязычные заметки — переключить язык",
+    },
+    status_bar: {
+        click_to_switch: "Нажмите, чтобы переключить язык",
+        all_languages: "Все языки",
+    },
+    menu: {
+        show_all_languages: "Показать все языки",
+        multilingual: "Многоязычие",
+        wrap: "Обернуть в языковой блок",
+        smart_insert: "Умная вставка блока",
+        manual_insert: "Вставить вручную",
+        existing_lang_prefix: "✓ {label}",
+    },
+    command: {
+        switch_language: "Переключить язык: {label}",
+        switch_show_all: "Переключить язык: Показать все",
+        cycle_next: "Переключиться на следующий язык",
+        insert_lang_block: "Вставить языковой блок",
+        smart_insert: "Умная вставка языкового блока",
+        wrap_selection: "Обернуть выделение",
+        insert_template: "Вставить шаблон (все языки)",
+    },
+    notice: {
+        language_switched: "Язык изменен на {label}",
+        showing_all_blocks: "Показаны все языковые блоки",
+        select_text_first: "Сначала выделите текст.",
+        current_language: "Текущий язык: {label}",
+        inserted_block: "Вставлен блок: {label}",
+        fully_internationalized: "✓ Полностью переведено",
+        keep_one_language: "Необходимо оставить хотя бы один язык.",
+    },
+    settings: {
+        title: "i8n — Настройки",
+        active_language_name: "Активный язык",
+        active_language_desc: "Язык, который отображается сейчас.",
+        default_language_name: "Язык по умолчанию",
+        default_language_desc:
+            "Язык для заметок без маркеров. При переключении на другой язык такие заметки скрываются.",
+        hide_other_name: "Скрывать другие языки в редакторе",
+        hide_other_desc:
+            "Когда включено: неактивные языки сворачиваются. Когда выключено: отображаются исходные тексты всех языков.",
+        show_lang_header_name: "Отображать панель языков в режиме чтения",
+        show_lang_header_desc: "Добавляет панель выбора языка поверх многоязычных заметок.",
+        show_ribbon_name: "Показывать иконку",
+        show_ribbon_desc: "Кнопка переключения языка на левой панели.",
+        show_status_bar_name: "Показывать в строке состояния",
+        show_status_bar_desc: "Отображает текущий язык в правом нижнем углу.",
+        configured_languages_title: "Настроенные языки",
+        configured_languages_desc:
+            "Добавляйте, удаляйте или изменяйте языки. «Код» должен точно совпадать с кодом в ваших маркерах.",
+        add_language_name: "Добавить новый язык",
+        add_language_button: "+ Добавить",
+        syntax_title: "Справочник по синтаксису",
+        syntax_desc: "Все 4 синтаксиса равнозначны. Выберите подходящий.",
+        copy: "Копировать",
+        copied: "Скопировано!",
+        no_marker_title: "💡 Заметки без маркеров",
+        no_marker_desc:
+            "Заметка без языковых маркеров считается написанной на Языке по умолчанию. Переход на другой язык скроет такую заметку.",
+        language_row: "Язык #{index}",
+        remove_language_tooltip: "Удалить этот язык",
+        code_placeholder: "код (например, ru)",
+        label_placeholder: "название (например, Русский)",
+        syntax_sample_content: "Текст / Content",
+        syntax: {
+            default_title: "Стандартный (стиль блоков Obsidian)",
+            default_note: "Рекомендуется. Собственный формат Obsidian.",
+            hexo_title: "Hexo / шаблонные теги",
+            hexo_note: "Виден в режиме чтения. Совместим с Hexo.",
+            comment_title: "Комментарий Markdown (ссылка)",
+            comment_note: "Скрыт в режиме чтения. Код языка указывается в скобках.",
+            obsidian_comment_title: "Комментарий Obsidian",
+            obsidian_comment_note: "Скрыт в Obsidian полностью.",
+        },
+    },
+} as const;
+
+export default ru;

@@ -1,0 +1,81 @@
+const hi = {
+    ribbon: {
+        switch_language: "बहुभाषी नोट्स — भाषा बदलें",
+    },
+    status_bar: {
+        click_to_switch: "भाषा बदलने के लिए क्लिक करें",
+        all_languages: "सभी भाषाएँ",
+    },
+    menu: {
+        show_all_languages: "सभी भाषाएँ दिखाएँ",
+        multilingual: "बहुभाषी",
+        wrap: "भाषा ब्लॉक में लपेटें",
+        smart_insert: "स्मार्ट इंसर्ट",
+        manual_insert: "मैन्युअल इंसर्ट",
+        existing_lang_prefix: "✓ {label}",
+    },
+    command: {
+        switch_language: "भाषा बदलें: {label}",
+        switch_show_all: "भाषा बदलें: सभी दिखाएँ",
+        cycle_next: "अगली भाषा पर जाएँ",
+        insert_lang_block: "भाषा ब्लॉक डालें",
+        smart_insert: "स्मार्ट भाषा ब्लॉक डालें",
+        wrap_selection: "चयन को लपेटें",
+        insert_template: "सभी भाषाओं का टेम्प्लेट डालें",
+    },
+    notice: {
+        language_switched: "भाषा को {label} में बदल दिया गया",
+        showing_all_blocks: "सभी भाषा ब्लॉक दिखा रहा है",
+        select_text_first: "कृपया पहले कुछ टेक्स्ट चुनें।",
+        current_language: "वर्तमान भाषा: {label}",
+        inserted_block: "{label} ब्लॉक डाला गया",
+        fully_internationalized: "✓ पूरी तरह से अंतर्राष्ट्रीयकृत",
+        keep_one_language: "कम से कम एक भाषा रखना अनिवार्य है।",
+    },
+    settings: {
+        title: "i8n — सेटिंग्स",
+        active_language_name: "सक्रिय भाषा",
+        active_language_desc: "वह भाषा जो वर्तमान में सभी नोट्स में दिखाई जाती है।",
+        default_language_name: "डिफ़ॉल्ट भाषा",
+        default_language_desc:
+            "यदि किसी नोट में कोई भाषा टैग नहीं है, तो उसे इस भाषा में माना जाएगा। अन्य भाषा चुनने पर वह नोट छिप जाएगा।",
+        hide_other_name: "संपादक में अन्य भाषाएँ छिपाएँ",
+        hide_other_desc:
+            "चालू होने पर: संपादन मोड में निष्क्रीय भाषाएँ ढँक जाती हैं। बंद होने पर: सभी भाषाएँ सामान्य रूप से दिखाई देती हैं।",
+        show_lang_header_name: "रीडिंग मोड में भाषा चयनकर्ता दिखाएँ",
+        show_lang_header_desc: "रीडिंग मोड में बहुभाषी नोट के शीर्ष पर भाषा चयनकर्ता दिखाता है।",
+        show_ribbon_name: "रिबन आइकन दिखाएँ",
+        show_ribbon_desc: "बाईं ओर के साइडबार में भाषा स्विच करने का बटन दिखाएँ।",
+        show_status_bar_name: "स्टेटस बार संकेतक दिखाएँ",
+        show_status_bar_desc: "निचले-दाएँ स्टेटस बार में सक्रिय भाषा दिखाएँ।",
+        configured_languages_title: "कॉन्फ़िगर की गई भाषाएँ",
+        configured_languages_desc:
+            "भाषाएँ जोड़ें, हटाएँ या संशोधित करें। 'कोड' बिल्कुल वैसा होना चाहिए जैसा कि आपके मार्कर में उपयोग किया गया है।",
+        add_language_name: "नई भाषा जोड़ें",
+        add_language_button: "+ भाषा जोड़ें",
+        syntax_title: "सिंटैक्स संदर्भ",
+        syntax_desc: "चारों सिंटैक्स समान रूप से काम करते हैं। जो आपको सबसे अच्छा लगे उसे चुनें।",
+        copy: "कॉपी",
+        copied: "कॉपी हो गया!",
+        no_marker_title: "💡 बिना भाषा मार्कर के नोट्स",
+        no_marker_desc:
+            "बिना मार्कर वाले किसी भी नोट को डिफ़ॉल्ट भाषा में लिखा गया माना जाता है। किसी अन्य भाषा पर स्विच करने से पूरा नोट छिप जाएगा।",
+        language_row: "भाषा #{index}",
+        remove_language_tooltip: "इस भाषा को हटाएँ",
+        code_placeholder: "कोड (जैसे hi)",
+        label_placeholder: "लेबल (जैसे हिन्दी)",
+        syntax_sample_content: "सामग्री / Content",
+        syntax: {
+            default_title: "डिफ़ॉल्ट (Obsidian ब्लॉक)",
+            default_note: "अनुशंसित। Obsidian में बहुत अच्छे से काम करता है।",
+            hexo_title: "Hexo / टेम्प्लेट टैग",
+            hexo_note: "रीडिंग मोड में दिखाई देता है। Hexo के साथ संगत।",
+            comment_title: "Markdown टिप्पणी (लिंक संदर्भ)",
+            comment_note: "रीडिंग मोड में पूरी तरह से छुपा हुआ। कोष्ठक में भाषा कोड।",
+            obsidian_comment_title: "Obsidian टिप्पणी शैली",
+            obsidian_comment_note: "Obsidian में पूरी तरह से छिपा हुआ।",
+        },
+    },
+} as const;
+
+export default hi;

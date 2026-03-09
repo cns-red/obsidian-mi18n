@@ -86,7 +86,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     );
   }
 
-  onunload(): void {}
+  onunload(): void { }
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -127,10 +127,6 @@ export default class MultilingualNotesPlugin extends Plugin {
     const outlineLeaves = this.app.workspace.getLeavesOfType("outline");
     if (outlineLeaves.length === 0) return;
 
-    ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
-      await this.setActiveLanguage(code);
-    });
-
     const resetAll = () => {
       for (const leaf of outlineLeaves) {
         leaf.view.containerEl.querySelectorAll<HTMLElement>(".tree-item").forEach((el) => {
@@ -141,16 +137,16 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     const activeFile = this.app.workspace.getActiveFile();
     const active = this.settings.activeLanguage;
-    if (!activeFile || active === "ALL") {
+
+    if (!activeFile) {
+      ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
+        await this.setActiveLanguage(code);
+      }, new Set()); // Hide pills if no active file
       resetAll();
       return;
     }
 
     const headings = this.app.metadataCache.getFileCache(activeFile)?.headings;
-    if (!headings || headings.length === 0) {
-      resetAll();
-      return;
-    }
 
     let sourceText: string | null = null;
     this.app.workspace.iterateAllLeaves((leaf) => {
@@ -161,14 +157,31 @@ export default class MultilingualNotesPlugin extends Plugin {
       }
     });
 
-    if (sourceText !== null) {
-      applyOutlineFilter(outlineLeaves, headings, sourceText, active, this.settings.defaultLanguage);
-      return;
-    }
+    const processWithText = (text: string) => {
+      // Find present languages
+      const blocks = parseLangBlocks(text);
+      const presentCodes = new Set<string>();
+      for (const block of blocks) {
+        block.langCode.split(/\s+/).filter(Boolean).forEach((c) => presentCodes.add(c));
+      }
 
-    this.app.vault.cachedRead(activeFile).then((text) => {
+      ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
+        await this.setActiveLanguage(code);
+      }, presentCodes);
+
+      if (active === "ALL" || !headings || headings.length === 0) {
+        resetAll();
+        return;
+      }
+
       applyOutlineFilter(outlineLeaves, headings, text, active, this.settings.defaultLanguage);
-    });
+    };
+
+    if (sourceText !== null) {
+      processWithText(sourceText);
+    } else {
+      this.app.vault.cachedRead(activeFile).then(processWithText);
+    }
   }
 
   refreshRibbon(): void {

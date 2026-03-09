@@ -1,5 +1,11 @@
 import en from "./locales/en";
 import zhCN from "./locales/zh-CN";
+import zhTW from "./locales/zh-TW";
+import ja from "./locales/ja";
+import ko from "./locales/ko";
+import fr from "./locales/fr";
+import ru from "./locales/ru";
+import hi from "./locales/hi";
 import type { I18nKey, MessagesShape } from "./types";
 
 export enum AppLocale {
@@ -12,6 +18,7 @@ export enum AppLocale {
   ES = "es",
   RU = "ru",
   KO = "ko",
+  HI = "hi",
 }
 
 type Messages = MessagesShape;
@@ -22,18 +29,25 @@ type Params = Record<string, Primitive>;
 const dictionaries: Record<string, Messages> = {
   [AppLocale.EN]: en,
   [AppLocale.ZH_CN]: zhCN,
+  [AppLocale.ZH_TW]: zhTW as Messages,
+  [AppLocale.JA]: ja as Messages,
+  [AppLocale.KO]: ko as Messages,
+  [AppLocale.FR]: fr as Messages,
+  [AppLocale.RU]: ru as Messages,
+  [AppLocale.HI]: hi as Messages,
 };
 
 const localeFallbackMap: Record<string, AppLocale> = {
   [AppLocale.EN]: AppLocale.EN,
   [AppLocale.ZH_CN]: AppLocale.ZH_CN,
-  [AppLocale.ZH_TW]: AppLocale.EN,
-  [AppLocale.JA]: AppLocale.EN,
-  [AppLocale.FR]: AppLocale.EN,
+  [AppLocale.ZH_TW]: AppLocale.ZH_TW,
+  [AppLocale.JA]: AppLocale.JA,
+  [AppLocale.FR]: AppLocale.FR,
   [AppLocale.DE]: AppLocale.EN,
   [AppLocale.ES]: AppLocale.EN,
-  [AppLocale.RU]: AppLocale.EN,
-  [AppLocale.KO]: AppLocale.EN,
+  [AppLocale.RU]: AppLocale.RU,
+  [AppLocale.KO]: AppLocale.KO,
+  [AppLocale.HI]: AppLocale.HI,
 };
 
 const warnedMissingKeys = new Set<string>();
@@ -48,9 +62,11 @@ function normalizeLocale(locale: string | null | undefined): string {
   if (dictionaries[trimmed]) return trimmed;
 
   const lower = trimmed.toLowerCase();
-  if (lower === "zh-cn") return AppLocale.ZH_CN;
+  if (lower === "zh-cn" || lower === "zh") return AppLocale.ZH_CN;
+  if (lower === "zh-tw" || lower === "zh-hk") return AppLocale.ZH_TW;
 
   const base = trimmed.split("-")[0];
+  if (base === "zh") return AppLocale.ZH_CN;
   return localeFallbackMap[base] ?? AppLocale.EN;
 }
 
@@ -77,6 +93,9 @@ export function initializeI18n(obsidianLocale?: string): void {
 }
 
 export function detectObsidianLocale(app?: unknown): string | undefined {
+  const fromStorage = typeof window !== "undefined" ? window.localStorage?.getItem("language") : null;
+  if (fromStorage && typeof fromStorage === "string" && fromStorage.trim()) return fromStorage;
+
   const appAny = app as Record<string, any> | undefined;
   const fromApp = appAny?.locale ?? appAny?.i18n?.locale;
   if (typeof fromApp === "string" && fromApp.trim()) return fromApp;
