@@ -76,6 +76,20 @@ export function initializeI18n(obsidianLocale?: string): void {
   currentLocale = localeFallbackMap[preferred] ?? AppLocale.EN;
 }
 
+export function detectObsidianLocale(app?: unknown): string | undefined {
+  const appAny = app as Record<string, any> | undefined;
+  const fromApp = appAny?.locale ?? appAny?.i18n?.locale;
+  if (typeof fromApp === "string" && fromApp.trim()) return fromApp;
+
+  const fromConfig = appAny?.vault?.getConfig?.("locale");
+  if (typeof fromConfig === "string" && fromConfig.trim()) return fromConfig;
+
+  const fromDocument = document?.documentElement?.lang;
+  if (typeof fromDocument === "string" && fromDocument.trim()) return fromDocument;
+
+  return undefined;
+}
+
 export function t(key: I18nKey, params?: Params): string {
   if (!currentLocale) initializeI18n();
 

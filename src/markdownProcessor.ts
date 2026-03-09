@@ -183,6 +183,9 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
             el.style.display = "none";
           } else {
             el.style.display = "";
+            if (showBadges && !block.openVisible) {
+              ensureBadgeForHiddenOpenMarker(el, block, plugin);
+            }
 
             if (block.closeLine >= 0 && lineEnd >= block.closeLine) {
               removeCloseMarkerFromElement(el);
@@ -238,6 +241,23 @@ function removeCloseMarkerFromElement(el: HTMLElement): void {
   }
 }
 
+
+
+function ensureBadgeForHiddenOpenMarker(
+  el: HTMLElement,
+  block: LangBlock,
+  plugin: MultilingualNotesPlugin,
+): void {
+  const owner = el.closest(".markdown-preview-sizer") ?? el.parentElement;
+  if (!owner) return;
+
+  const marker = `ml-badge-${block.openLine}`;
+  if (owner.querySelector(`[data-ml-badge-for="${marker}"]`)) return;
+
+  const badge = createBadge(block.langCode, plugin);
+  badge.setAttribute("data-ml-badge-for", marker);
+  el.before(badge);
+}
 
 function createBadge(langCode: string, plugin: MultilingualNotesPlugin): HTMLElement {
   const normalized = langCode.trim();

@@ -21,7 +21,7 @@ import {
   parseLangBlocks,
 } from "./src/markdownProcessor";
 import { buildEditorExtension, setActiveLangEffect } from "./src/editorExtension";
-import { initializeI18n, t } from "./src/i18n";
+import { detectObsidianLocale, initializeI18n, t } from "./src/i18n";
 import {
   getInsertionLanguageCode,
   insertLangBlock,
@@ -39,7 +39,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    initializeI18n((this.app as any)?.vault?.getConfig?.("locale"));
+    initializeI18n(detectObsidianLocale(this.app));
 
     registerReadingModeProcessor(this);
     this.registerEditorExtension(
