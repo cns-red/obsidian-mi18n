@@ -8,11 +8,39 @@
   user-select: none;
 }
 
+.ml-status-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .ml-status-wrapper {
   display: flex;
   align-items: center;
   gap: 4px;
+  cursor: pointer;
   padding: 0 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.ml-status-wrapper:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.ml-status-compare-btn {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+  color: var(--text-muted);
+}
+
+.ml-status-compare-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 .ml-status-icon {
@@ -43,16 +71,15 @@
  * transparent and inherit the track's muted background.
  */
 .ml-lang-header {
-  /* Shrink to content width, then centre within the article column */
   display: flex;
   width: fit-content;
-  margin: 10px auto 16px;
+  margin: 8px 0 10px;
   align-items: center;
   gap: 2px;
   padding: 3px;
   background: var(--background-secondary-alt, var(--background-secondary));
   border: 1px solid var(--background-modifier-border);
-  border-radius: 100px;
+  border-radius: 7px;
 }
 
 .ml-lang-pill {
@@ -63,7 +90,7 @@
   font-weight: 500;
   letter-spacing: 0.01em;
   padding: 4px 16px;
-  border-radius: 100px;
+  border-radius: 4px;
   cursor: pointer;
   user-select: none;
   color: var(--text-muted);
@@ -149,9 +176,6 @@
 }
 
 /* Subtle divider between pills (skip after the last one) */
-.ml-outline-pill:not(:last-child) {}
-
-/* ── Reading mode: active language block wrapper ──────────────────────── */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Settings page — card-based layout
@@ -467,209 +491,281 @@
   border-top: none;
 }
 
-/* ── AI Translation Modal (Glassmorphism & Elegance) ────────────── */
+/* ── Smart Translation Modal ─────────────────────────────────────────── */
 
-.ml-translation-modal-window.modal-container {
-  /* Apple-like expansive modal */
-  width: 95vw;
-  max-width: 1000px;
-  height: 85vh;
-  max-height: 900px;
+/* Modal shell */
+.ml-tr-modal.modal {
+  width: min(92vw, 1080px) !important;
+  height: min(88vh, 860px) !important;
+  max-width: none !important;
+  max-height: none !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.16), 0 4px 16px rgba(0,0,0,.08) !important;
 }
 
-.ml-translation-modal.modal {
-  /* Glassmorphism setup */
-  background: var(--background-primary);
-  background: rgba(var(--background-primary-rgb, 255, 255, 255), 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
+.theme-dark .ml-tr-modal.modal {
+  box-shadow: 0 20px 60px rgba(0,0,0,.42), 0 0 0 .5px rgba(255,255,255,.06) inset !important;
+}
 
-  /* Inner spacing */
-  padding: 32px 40px;
+/* contentEl (modal-content): fill the modal, flex-column, no scroll */
+.ml-tr-modal .modal-content {
+  padding: 0 !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ── Header (title + lang row) ───────────────────────────────────────── */
+.ml-tr-header {
+  padding: 22px 28px 18px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.ml-tr-title {
+  margin: 0 0 18px;
+  font-size: 1.15em;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--text-normal);
+}
+
+/* ── Language Selector Row ───────────────────────────────────────────── */
+.ml-tr-lang-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ml-tr-lang-group {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  /* Hide modal scrollbar to handle it internally */
+  gap: 5px;
 }
 
-/* Dark mode overrides for Glassmorphism */
-.theme-dark .ml-translation-modal.modal {
-  background: rgba(30, 30, 30, 0.7);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.ml-translation-modal h2 {
-  font-size: 1.6em;
+.ml-tr-lang-label {
+  font-size: 10px;
   font-weight: 600;
-  margin-top: 0;
-  margin-bottom: 24px;
-  text-align: center;
-  color: var(--text-normal);
-  letter-spacing: -0.02em;
-}
-
-.ml-translation-modal h4 {
-  margin-top: 24px;
-  margin-bottom: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  font-size: 0.9em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-left: 2px;
 }
 
-/* Settings Row (Source & Target Dropdowns side-by-side) */
-.ml-translation-settings-row {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 16px;
-  justify-content: center;
-}
-
-.ml-translation-settings-row .setting-item {
-  border: none;
-  padding: 0;
-  margin: 0;
-  flex: 1;
-  max-width: 300px;
-  background: var(--background-secondary-alt);
-  padding: 12px 16px;
-  border-radius: 12px;
+.ml-tr-select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--background-secondary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
   border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 7px 30px 7px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-normal);
+  min-width: 145px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
 }
 
-.ml-translation-settings-row .setting-item-info {
-  flex-grow: 1;
+.ml-tr-select:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2.5px rgba(var(--interactive-accent-rgb, 100,100,200), .18);
 }
 
-/* Make setting rows sleeker */
-.ml-translation-modal .setting-item {
-  border: none;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(var(--background-modifier-border-rgb, 0, 0, 0), 0.05);
+.ml-tr-arrow {
+  font-size: 18px;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-.theme-dark .ml-translation-modal .setting-item {
-  border-bottom-color: rgba(255, 255, 255, 0.05);
-}
-
-.ml-translate-btn-row {
+.ml-tr-btn-wrap {
+  margin-left: auto;
+  margin-bottom: 0;
   display: flex;
-  justify-content: center;
-  margin: 24px 0;
+  align-items: flex-end;
 }
 
-.ml-translate-btn-row .mod-cta {
-  font-size: 1.1em;
-  padding: 8px 32px;
-  height: auto;
-  border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 0, 0, 0), 0.2);
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+.ml-tr-generate-btn.mod-cta {
+  border-radius: 20px !important;
+  padding: 7px 22px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  transition: opacity .15s, transform .1s !important;
 }
 
-.ml-translate-btn-row .mod-cta:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(var(--interactive-accent-rgb, 0, 0, 0), 0.3);
+.ml-tr-generate-btn.mod-cta:not(:disabled):hover {
+  transform: translateY(-1px) !important;
 }
 
-/* Split Layout */
-.ml-translation-split {
+.ml-tr-generate-btn.ml-tr-spinning {
+  opacity: .7 !important;
+}
+
+/* ── Split Panels ────────────────────────────────────────────────────── */
+.ml-tr-split {
   display: flex;
-  gap: 24px;
-  flex-grow: 1;
+  flex: 1;
   min-height: 0;
-  /* Important for scrollable flex children */
-  margin-bottom: 16px;
+  overflow: hidden;
+  gap: 0;
+  background: var(--background-modifier-border); /* acts as divider */
 }
 
-.ml-translation-col {
+.ml-tr-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* Prevent flex blowout */
-  border-radius: 12px;
-  background: var(--background-primary-alt);
-  background: rgba(var(--background-primary-alt-rgb, 250, 250, 250), 0.5);
-  border: 1px solid var(--background-modifier-border);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.02);
   overflow: hidden;
+  background: var(--background-primary);
 }
 
-.theme-dark .ml-translation-col {
-  background: rgba(0, 0, 0, 0.2);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-.ml-translation-col-header {
+.ml-tr-panel-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: var(--background-secondary-alt);
+  justify-content: space-between;
+  padding: 10px 18px;
+  height: 48px;
+  background: var(--background-secondary);
   border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
 }
 
-.ml-translation-col-header h4 {
-  margin: 0;
+.ml-tr-panel-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
 }
 
-.ml-translation-target-container {
-  flex-grow: 1;
+.ml-tr-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  transition: background .12s, color .12s, border-color .12s;
+}
+
+.ml-tr-icon-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border);
+}
+
+.ml-tr-icon-btn[data-active="true"] {
+  background: rgba(var(--interactive-accent-rgb, 100,100,200), .12);
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.ml-tr-panel-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  position: relative;
   overflow: hidden;
+  position: relative;
 }
 
-/* Markdown preview pane */
-.ml-markdown-preview {
-  flex-grow: 1;
-  padding: 16px;
+/* Scrollable markdown preview */
+.ml-tr-preview {
+  flex: 1;
   overflow-y: auto;
+  padding: 20px 24px;
   font-family: var(--font-text);
-  line-height: 1.6;
+  font-size: var(--font-text-size, 15px);
+  line-height: 1.7;
+  color: var(--text-normal);
+  min-height: 0;
 }
 
-/* Text area for editing */
-.ml-translation-target-container textarea {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
+.ml-tr-preview p:first-child { margin-top: 0; }
+.ml-tr-preview p:last-child  { margin-bottom: 0; }
+
+/* Streaming cursor */
+.ml-tr-preview.ml-tr-streaming::after {
+  content: "▋";
+  display: inline;
+  color: var(--interactive-accent);
+  animation: ml-cursor-blink .75s step-end infinite;
+}
+
+@keyframes ml-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Editable textarea */
+.ml-tr-textarea {
+  flex: 1;
   resize: none;
-  font-family: var(--font-text);
-  font-size: 1.1em;
-  padding: 16px;
   border: none;
-  background: transparent;
   outline: none;
-  box-shadow: none;
+  padding: 20px 24px;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size, 15px);
+  line-height: 1.7;
+  background: transparent;
+  color: var(--text-normal);
+  box-shadow: none !important;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-.ml-action-row {
+/* ── Footer ──────────────────────────────────────────────────────────── */
+.ml-tr-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  padding-top: 16px;
+  gap: 10px;
+  padding: 14px 24px;
+  background: var(--background-secondary);
   border-top: 1px solid var(--background-modifier-border);
-  margin-top: auto;
-  /* Push to bottom */
+  flex-shrink: 0;
 }
 
-.ml-action-row button {
-  border-radius: 8px;
-  padding: 6px 20px;
-  font-weight: 500;
+.ml-tr-insert-btn.mod-cta {
+  border-radius: 20px !important;
+  padding: 7px 22px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+/* ── Error state ─────────────────────────────────────────────────────── */
+.ml-tr-error {
+  padding: 40px 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ── Editor context menu: hover-picker items (show › arrow) ──────────── */
+.menu-item.ml-picker-item .menu-item-title::after {
+  content: " ›";
+  opacity: 0.45;
 }
 
 /* ── Reading mode: hide the language blocks and fence markers ─────────── */
@@ -728,4 +824,12 @@
 
 .ml-comparison-btn-row button:hover {
   transform: translateY(-1px);
+}
+
+/* ── Hide plugin-managed frontmatter fields in reading mode ────────────── */
+/* li8n and li8n_view are internal bookkeeping fields; no need to show them
+   to readers. They remain fully visible in the editor's Properties panel.  */
+.markdown-preview-view .metadata-property[data-property-key="li8n"],
+.markdown-preview-view .metadata-property[data-property-key="li8n_view"] {
+  display: none;
 }

@@ -15,6 +15,11 @@ export class CompareManager {
 
     constructor(private app: App, private plugin: MultilingualNotesPlugin) { }
 
+    /** Returns true when the given leaf is part of an active comparison session. */
+    public isComparisonLeaf(leaf: WorkspaceLeaf): boolean {
+        return this.activeComparisonLeaves.has(leaf);
+    }
+
     public getActiveComparisonLanguages(): Set<string> {
         const langs = new Set<string>();
         for (const leaf of this.activeComparisonLeaves) {

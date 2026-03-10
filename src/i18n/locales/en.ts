@@ -19,6 +19,8 @@ const en = {
     apply_comparison: "Apply Split View",
     return_normal: "Return to Normal Mode",
     copy: "Copy",
+    paste_as: "Paste as...",
+    delete: "Delete",
     export: "Export",
   },
   command: {
@@ -41,6 +43,8 @@ const en = {
     api_key_missing: "API Key is not configured. Please go to settings first.",
     empty_insertion: "Cannot insert empty text.",
     copied: "Copied!",
+    pasted: "Pasted!",
+    deleted: "Deleted block",
   },
   settings: {
     title: "li8n — Settings",

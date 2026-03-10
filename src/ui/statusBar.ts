@@ -13,10 +13,12 @@ export function getActiveLabel(settings: MultilingualNotesSettings, activeLangua
 export function buildStatusBar(
   statusBarEl: HTMLElement,
   settings: MultilingualNotesSettings,
-  onShowLanguageMenu: (evt: MouseEvent) => void,
+  onLanguageClick: (evt: MouseEvent) => void,
+  onCompareClick: (evt: MouseEvent) => void,
   activeLanguage: string
 ): void {
   statusBarEl.empty();
+  statusBarEl.addClass("ml-status-bar-container");
 
   const wrapper = statusBarEl.createDiv("ml-status-wrapper");
   const icon = wrapper.createSpan("ml-status-icon");
@@ -25,32 +27,49 @@ export function buildStatusBar(
   const label = wrapper.createSpan("ml-status-label");
   label.textContent = getActiveLabel(settings, activeLanguage);
   label.setAttribute("title", t("status_bar.click_to_switch"));
-  label.style.cursor = "pointer";
+  
+  wrapper.style.cursor = "pointer";
+  wrapper.style.display = "flex";
+  wrapper.style.alignItems = "center";
+  wrapper.style.gap = "4px";
+  wrapper.onclick = onLanguageClick;
 
-  statusBarEl.onclick = onShowLanguageMenu;
+  const compareBtn = statusBarEl.createDiv("ml-status-compare-btn");
+  setIcon(compareBtn, "columns-4");
+  compareBtn.setAttribute("title", t("menu.compare_languages"));
+  compareBtn.style.cursor = "pointer";
+  compareBtn.style.marginLeft = "6px";
+  compareBtn.style.display = "flex";
+  compareBtn.style.alignItems = "center";
+  compareBtn.onclick = onCompareClick;
 }
 
 export function showLanguageMenu(
   evt: MouseEvent,
   settings: MultilingualNotesSettings,
-  onSetActiveLanguage: (code: string) => Promise<void>
+  onSetActiveLanguage: (code: string) => Promise<void>,
+  availableCodes?: Set<string>,
+  currentLeafLanguage?: string
 ): void {
   const menu = new Menu();
 
   menu.addItem((item) => {
     item
       .setTitle(t("menu.show_all_languages"))
-      .setChecked(settings.activeLanguage === "ALL")
+      .setChecked((currentLeafLanguage || settings.activeLanguage) === "ALL")
       .onClick(async () => onSetActiveLanguage("ALL"));
   });
 
   menu.addSeparator();
 
   for (const lang of settings.languages) {
+    if (availableCodes && availableCodes.size > 0 && !availableCodes.has(lang.code.toLowerCase()) && lang.code.toLowerCase() !== "all") {
+      continue;
+    }
     menu.addItem((item) => {
       item
         .setTitle(lang.label)
-        .setChecked(settings.activeLanguage.toLowerCase() === lang.code.toLowerCase())
+        .setChecked((currentLeafLanguage || settings.activeLanguage).toLowerCase() === lang.code.toLowerCase())
         .onClick(async () => onSetActiveLanguage(lang.code));
     });
   }

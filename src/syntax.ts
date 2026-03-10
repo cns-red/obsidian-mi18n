@@ -8,7 +8,7 @@ export const COMMENT_CLOSE_MARKER = "[//]: # (endli8n)";
 
 /** Open-marker patterns. Capture group 1 contains one or more language codes. */
 export const OPEN_PATTERNS: RegExp[] = [
-  /^:::li8n\s+([\w-]+(?:\s+[\w-]+)*)\s*$/,
+  /^:::\s*li8n\s+([\w-]+(?:\s+[\w-]+)*)\s*$/,
   /^\{%-?\s*li8n\s+([\w-]+(?:\s+[\w-]+)*)\s*-?%\}$/i,
   /^\[\/\/\]:\s*#\s*\(li8n\s+([\w-]+(?:\s+[\w-]+)*)\)\s*$/i,
   /^%%\s*li8n\s+([\w-]+(?:\s+[\w-]+)*)\s*%%$/i,

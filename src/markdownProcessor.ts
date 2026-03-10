@@ -161,6 +161,22 @@ export function parseLangBlocks(source: string): LangBlock[] {
   return blocks;
 }
 
+export function extractAvailableLanguagesFromBlocks(blocks: LangBlock[], configuredLanguages: { code: string }[]): Set<string> {
+  const existing = new Set<string>();
+  let hasAll = false;
+  for (const block of blocks) {
+    block.langCode.split(/\s+/).filter(Boolean).forEach((c) => {
+      const lower = c.toLowerCase();
+      if (lower === "all") hasAll = true;
+      else existing.add(lower);
+    });
+  }
+  if (hasAll) {
+    configuredLanguages.forEach((l) => existing.add(l.code.toLowerCase()));
+  }
+  return existing;
+}
+
 // ── Post-processor ────────────────────────────────────────────────────────────
 
 export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): void {
@@ -251,6 +267,9 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       evaluateVisibility(initialActive);
       if (blocks.length > 0 && showLangHeader) {
         ensureLangHeader(el, blocks, plugin, initialActive);
+      } else {
+        const owner = el.closest(".markdown-preview-sizer");
+        owner?.querySelector(".ml-lang-header")?.remove();
       }
 
       // 2. Lifecycle Component: Solves rendering bugs triggered by async chunk scrolling.
@@ -274,6 +293,9 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
           // Always refresh the header once genuinely attached to the Leaf.
           if (blocks.length > 0 && showLangHeader) {
             ensureLangHeader(el, blocks, plugin, mountedActive);
+          } else {
+            const owner = el.closest(".markdown-preview-sizer");
+            owner?.querySelector(".ml-lang-header")?.remove();
           }
         }
       };
@@ -359,11 +381,8 @@ function ensureLangHeader(
     return;
   }
 
-  // Collect unique language codes present in this document.
-  const langCodes = new Set<string>();
-  for (const block of blocks) {
-    block.langCode.split(/\s+/).filter(Boolean).forEach((c) => langCodes.add(c.toLowerCase()));
-  }
+  // Collect unique language codes present in this document, expanding "ALL" appropriately.
+  const langCodes = extractAvailableLanguagesFromBlocks(blocks, plugin.settings.languages);
 
   const existing = owner.querySelector(".ml-lang-header");
   if (langCodes.size === 0) {
@@ -391,18 +410,14 @@ function ensureLangHeader(
     }
 
     if (match) {
-      // Just update active highlights
+      // Only toggle active class — never reposition an already-placed header,
+      // because any DOM move triggers a layout reflow that shows as jitter.
       pills.forEach((pill) => {
         const code = pill.getAttribute("data-lang");
         if (!code) return;
         const isActive = (active === "ALL") ? code === "ALL" : active.toLowerCase() === code.toLowerCase();
-        if (isActive) {
-          pill.classList.add("ml-lang-pill--active");
-        } else {
-          pill.classList.remove("ml-lang-pill--active");
-        }
+        pill.classList.toggle("ml-lang-pill--active", isActive);
       });
-      positionHeader(existing as HTMLElement, owner);
       return;
     } else {
       existing.remove();
@@ -449,28 +464,38 @@ function ensureLangHeader(
   positionHeader(header, owner);
 }
 
-function positionHeader(header: HTMLElement, owner: Element) {
-  // Insert right below frontmatter or title if possible
-  const frontmatter = owner.querySelector(".frontmatter-container, .metadata-container");
-  if (frontmatter) {
-    const wrap = frontmatter.closest(".markdown-preview-section");
-    const target = (wrap && wrap.parentElement === owner) ? wrap : frontmatter;
-    if (header.previousElementSibling !== target) {
-      target.after(header);
-    }
-  } else {
-    const title = owner.querySelector(".mod-header, .inline-title");
-    if (title) {
-      const wrap = title.closest(".markdown-preview-section");
-      const target = (wrap && wrap.parentElement === owner) ? wrap : title;
-      if (header.previousElementSibling !== target) {
-        target.after(header);
+function positionHeader(header: HTMLElement, owner: Element): void {
+  // Strategy A: insert directly BEFORE the metadata/properties section.
+  // This reliably lands the bar between the inline title and the properties panel
+  // regardless of whether the panel is collapsed or expanded.
+  // NOTE: .mod-header is intentionally excluded from the title selector because
+  // it also matches headings INSIDE the expanded metadata panel, which would put
+  // the bar at the wrong position when properties are expanded.
+  const meta = owner.querySelector(".metadata-container, .frontmatter-container");
+  if (meta) {
+    const metaSection = meta.closest(".markdown-preview-section");
+    if (metaSection && metaSection.parentElement === owner) {
+      if (header.nextElementSibling !== metaSection) {
+        metaSection.before(header);
       }
-    } else {
-      if (owner.firstElementChild !== header) {
-        owner.prepend(header);
-      }
+      return;
     }
+  }
+
+  // Strategy B: no properties panel — insert after the inline-title section.
+  const title = owner.querySelector(".inline-title");
+  if (title) {
+    const section = title.closest(".markdown-preview-section");
+    const anchor = (section && section.parentElement === owner) ? section : title;
+    if (header.previousElementSibling !== anchor) {
+      anchor.after(header);
+    }
+    return;
+  }
+
+  // Strategy C: neither element found — prepend to top of the sizer.
+  if (owner.firstElementChild !== header) {
+    owner.prepend(header);
   }
 }
 

@@ -8,6 +8,8 @@ import {
   Plugin,
   WorkspaceLeaf,
   TAbstractFile,
+  TFile,
+  debounce,
 } from "obsidian";
 
 import {
@@ -20,8 +22,10 @@ import {
   registerReadingModeProcessor,
   clearBlockCache,
   parseLangBlocks,
+  extractAvailableLanguagesFromBlocks
 } from "./src/markdownProcessor";
 import { buildEditorExtension, setActiveLangEffect } from "./src/editorExtension";
+import { matchLanguageBlockOpen, isLanguageBlockClose } from "./src/syntax";
 import { detectObsidianLocale, initializeI18n, t } from "./src/i18n";
 import {
   getInsertionLanguageCode,
@@ -42,6 +46,8 @@ export default class MultilingualNotesPlugin extends Plugin {
   private languageRefreshToken = 0;
   public leafLanguageOverrides = new WeakMap<WorkspaceLeaf, { code: string, filePath: string }>();
   public compareManager!: CompareManager;
+  /** Tracks each MarkdownView's last-known mode to detect edit→preview transitions. */
+  private _viewModes = new WeakMap<MarkdownView, string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -94,8 +100,7 @@ export default class MultilingualNotesPlugin extends Plugin {
                     langItem.onClick(async () => {
                       const content = await this.app.vault.read(file);
                       const blocks = parseLangBlocks(content);
-                      const existing = new Set<string>();
-                      blocks.forEach(b => b.langCode.split(/\s+/).forEach(c => existing.add(c.toLowerCase())));
+                      const existing = extractAvailableLanguagesFromBlocks(blocks, this.settings.languages);
 
                       if (!existing.has(lang.code.toLowerCase()) && existing.size > 0) {
                         new Notice(`No ${lang.label} block found. Exporting shared content only.`);
@@ -116,6 +121,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf: WorkspaceLeaf | null) => {
         if (!leaf) return;
         this.applyFrontmatterOverride(leaf);
+        this.refreshStatusBar();
         setTimeout(() => this.filterOutlineView(), 0);
       })
     );
@@ -130,6 +136,48 @@ export default class MultilingualNotesPlugin extends Plugin {
         clearBlockCache();
         this.refreshAllViews();
         setTimeout(() => this.filterOutlineView(), 0);
+      })
+    );
+
+    this.registerEvent(
+      this.app.workspace.on(
+        "editor-change",
+        debounce((editor: Editor, info: MarkdownView) => {
+          this.normalizeMarkerSpacing(editor);
+          this.syncLi8nFrontmatter(editor, (info as any).file ?? null);
+        }, 800, true)
+      )
+    );
+
+    // Run on file open (covers files opened without editing).
+    this.registerEvent(
+      this.app.workspace.on("file-open", (file) => {
+        if (!file || file.extension !== "md") return;
+        setTimeout(() => {
+          const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (!view || view.file?.path !== file.path) return;
+          this.normalizeMarkerSpacing(view.editor);
+          this.syncLi8nFrontmatter(view.editor, file);
+        }, 0);
+      })
+    );
+
+    // Run on edit→preview transition (user switches to reading mode).
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        this.app.workspace.iterateAllLeaves((leaf) => {
+          if (!(leaf.view instanceof MarkdownView)) return;
+          const view = leaf.view as MarkdownView;
+          const mode = view.getMode();
+          const prev = this._viewModes.get(view);
+          this._viewModes.set(view, mode);
+          // Only fire on the exact moment of transition to preview.
+          if (mode !== "preview" || prev === "preview") return;
+          const file = view.file;
+          if (!file) return;
+          this.normalizeMarkerSpacing(view.editor);
+          this.syncLi8nFrontmatter(view.editor, file);
+        });
       })
     );
   }
@@ -370,9 +418,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     const processWithText = (text: string) => {
       // Find present languages
       const blocks = parseLangBlocks(text);
-      for (const block of blocks) {
-        block.langCode.split(/\s+/).filter(Boolean).forEach((c) => normalizedPresentCodes.add(c.toLowerCase()));
-      }
+      const normalizedPresentCodes = extractAvailableLanguagesFromBlocks(blocks, this.settings.languages);
 
       ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
         await this.setLanguageForActiveLeaf(code);
@@ -403,6 +449,26 @@ export default class MultilingualNotesPlugin extends Plugin {
       buildStatusBar(
         this.statusBarEl,
         this.settings,
+        (evt) => {
+          const activeFile = this.app.workspace.getActiveFile();
+          if (!activeFile) return;
+
+          const openLangMenu = (source: string) => {
+            const blocks = parseLangBlocks(source);
+            const parsedCodes = extractAvailableLanguagesFromBlocks(blocks, this.settings.languages);
+            showLanguageMenu(evt, this.settings, async (code) => {
+              await this.setLanguageForActiveLeaf(code);
+              this.refreshStatusBar();
+            }, parsedCodes, this.getEffectiveLanguageForActiveLeaf());
+          };
+
+          const editorText = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor?.getValue();
+          if (editorText != null) {
+            openLangMenu(editorText);
+          } else {
+            this.app.vault.cachedRead(activeFile).then(openLangMenu);
+          }
+        },
         () => {
           import("./src/ui/compareModal").then(({ ComparisonModal }) => {
             const activeFile = this.app.workspace.getActiveFile();
@@ -410,9 +476,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
             const openModal = (source: string) => {
               const blocks = parseLangBlocks(source);
-              const s = new Set<string>();
-              blocks.forEach(b => b.langCode.split(/\s+/).filter(Boolean).forEach(c => s.add(c.toLowerCase())));
-              const parsedCodes = Array.from(s);
+              const parsedCodes = Array.from(extractAvailableLanguagesFromBlocks(blocks, this.settings.languages));
               const selectedLangs = this.compareManager.getActiveComparisonLanguages();
               if (selectedLangs.size === 0) {
                 selectedLangs.add(this.getEffectiveLanguageForActiveLeaf());
@@ -542,88 +606,135 @@ export default class MultilingualNotesPlugin extends Plugin {
   private addEditorContextMenuItems(menu: Menu, editor: Editor): void {
     menu.addItem((item) => {
       item.setTitle(t("menu.multilingual")).setIcon("languages");
+      item.setSection("action");
       const submenu = (item as any).setSubmenu() as Menu;
 
-      submenu.addItem((subItem) => {
-        subItem.setTitle(t("menu.wrap")).setIcon("wrap-text").onClick(() => {
-          if (!wrapSelectionInLangBlock(editor, this.getInsertionLanguageCode())) {
-            new Notice(t("notice.select_text_first"));
-          }
+      // Track the currently visible language picker so we can close it when
+      // the user moves to a different item. Avoids Obsidian's sibling-submenu
+      // tracking bug by managing visibility ourselves (no setSubmenu on pickers).
+      let activeLangMenu: Menu | null = null;
+
+      const closeLangMenu = () => {
+        if (activeLangMenu) { activeLangMenu.hide(); activeLangMenu = null; }
+      };
+
+      /** Wrap a plain item so that hovering it closes any open lang picker. */
+      const plain = (build: (s: any) => void) => {
+        submenu.addItem((s) => {
+          build(s);
+          setTimeout(() => {
+            const el = (s as any).dom as HTMLElement;
+            el?.addEventListener("mouseenter", closeLangMenu);
+          }, 0);
         });
-      });
+      };
 
-      submenu.addItem((subItem) => {
-        subItem.setTitle(t("menu.smart_translate") || "Smart Translation").setIcon("bot").onClick(() => this.openTranslationModal(editor));
-      });
-
-      submenu.addItem((subItem) => {
-        subItem.setTitle(t("menu.copy") || "Copy").setIcon("copy");
-        const copySubmenu = (subItem as any).setSubmenu() as Menu;
-        const existingLanguages = this.detectExistingLanguages(editor);
-
-        if (existingLanguages.size === 0) {
-          copySubmenu.addItem((langItem) => {
-            langItem.setTitle(t("notice.fully_internationalized") || "No language blocks");
-            langItem.setDisabled(true);
-          });
-        } else {
-          for (const langCode of Array.from(existingLanguages)) {
-            const lang = this.settings.languages.find(l => l.code.toLowerCase() === langCode) || { label: langCode, code: langCode };
-            copySubmenu.addItem((langItem) => {
-              langItem.setTitle(lang.label);
-              langItem.onClick(() => {
-                const extracted = this.extractLanguageContent(editor.getValue(), lang.code);
-                navigator.clipboard.writeText(extracted).then(() => {
-                  new Notice((t("notice.copied") || "Copied!") + ` (${lang.label})`);
-                });
-              });
+      /**
+       * Item that shows a language-picker Menu to its right on hover.
+       * Does NOT call setSubmenu() — that's what causes Obsidian to lock the
+       * first hovered sibling's submenu for all subsequent hover events.
+       */
+      const picker = (title: string, icon: string, buildItems: (m: Menu) => void) => {
+        submenu.addItem((s) => {
+          s.setTitle(title).setIcon(icon);
+          setTimeout(() => {
+            const el = (s as any).dom as HTMLElement;
+            if (!el) return;
+            el.classList.add("ml-picker-item");
+            el.addEventListener("mouseenter", () => {
+              closeLangMenu();
+              const langMenu = new Menu();
+              buildItems(langMenu);
+              const r = el.getBoundingClientRect();
+              langMenu.showAtPosition({ x: r.right + window.scrollX, y: r.top + window.scrollY });
+              activeLangMenu = langMenu;
             });
-          }
+          }, 0);
+        });
+      };
+
+      plain((s) => s.setTitle(t("menu.wrap")).setIcon("code").onClick(() => {
+        if (!wrapSelectionInLangBlock(editor, this.getInsertionLanguageCode()))
+          new Notice(t("notice.select_text_first"));
+      }));
+
+      picker(t("menu.copy") || "Copy", "copy", (m) => {
+        const existing = this.detectExistingLanguages(editor);
+        if (existing.size === 0) {
+          m.addItem((i) => i.setTitle(t("notice.fully_internationalized") || "No language blocks").setDisabled(true));
+          return;
+        }
+        for (const langCode of Array.from(existing)) {
+          const lang = this.settings.languages.find(l => l.code.toLowerCase() === langCode) || { label: langCode, code: langCode };
+          m.addItem((i) => i.setTitle(lang.label).onClick(() => {
+            const extracted = this.extractLanguageContent(editor.getValue(), lang.code);
+            navigator.clipboard.writeText(extracted).then(() =>
+              new Notice((t("notice.copied") || "Copied!") + ` (${lang.label})`)
+            );
+          }));
         }
       });
 
-      submenu.addItem((subItem) => {
-        subItem.setTitle(t("menu.smart_insert") || "Smart Insert").setIcon("sparkles").onClick(() => this.smartInsertLanguageBlock(editor));
-      });
-
-      submenu.addItem((subItem) => {
-        subItem.setTitle(t("menu.manual_insert")).setIcon("list");
-        const langSubmenu = (subItem as any).setSubmenu() as Menu;
-        const existingLanguages = this.detectExistingLanguages(editor);
-
+      picker(t("menu.paste_as") || "Paste as...", "between-horizontal-start", (m) => {
+        const existing = this.detectExistingLanguages(editor);
         for (const lang of this.settings.languages) {
-          const exists = existingLanguages.has(lang.code);
-          langSubmenu.addItem((langItem) => {
-            langItem.setTitle(lang.label);
-            if (exists) {
-              langItem.setDisabled(true);
-              setTimeout(() => {
-                const el = (langItem as any).dom as HTMLElement;
-                if (!el) return;
-                el.style.opacity = "0.4";
-                el.style.cursor = "not-allowed";
-                const titleEl = el.querySelector(".menu-item-title");
-                if (titleEl) titleEl.textContent = t("menu.existing_lang_prefix", { label: lang.label });
-              }, 0);
-            } else {
-              langItem.onClick(() => insertLangBlockForLanguage(editor, lang.code));
-            }
+          const exists = existing.has(lang.code.toLowerCase());
+          m.addItem((i) => {
+            i.setTitle(lang.label);
+            if (exists) { i.setDisabled(true); return; }
+            i.onClick(async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (!text) { new Notice("Clipboard is empty."); return; }
+                const wrapped = `\n\n:::li8n ${lang.code}\n${text}\n:::\n\n`;
+                const cursor = editor.getCursor();
+                editor.replaceRange(wrapped, cursor);
+                new Notice((t("notice.pasted") || "Pasted!") + ` (${lang.label})`);
+                editor.setCursor({ line: cursor.line + wrapped.split('\n').length - 1, ch: 0 });
+              } catch (_) { new Notice("Failed to read clipboard."); }
+            });
           });
         }
       });
-    });
 
-    setTimeout(() => {
-      const menuDom = (menu as any).dom as HTMLElement;
-      if (!menuDom) return;
-      const allItems = Array.from(menuDom.querySelectorAll<HTMLElement>(".menu-item"));
-      const ourItem = allItems.find((el) => el.querySelector(".lucide-languages") || el.querySelector("[data-icon='languages']"));
-      const insertItem = allItems.find((el) => el.querySelector(".lucide-list-plus") || el.querySelector("[data-icon='list-plus']"));
-      if (ourItem && insertItem) {
-        ourItem.remove();
-        insertItem.after(ourItem);
-      }
-    }, 0);
+      picker(t("menu.delete") || "Delete", "trash-2", (m) => {
+        const existing = this.detectExistingLanguages(editor);
+        if (existing.size === 0) {
+          m.addItem((i) => i.setTitle(t("notice.fully_internationalized") || "No language blocks").setDisabled(true));
+          return;
+        }
+        for (const langCode of Array.from(existing)) {
+          const lang = this.settings.languages.find(l => l.code.toLowerCase() === langCode) || { label: langCode, code: langCode };
+          m.addItem((i) => i.setTitle(lang.label).onClick(() => {
+            const source = editor.getValue();
+            const blocks = parseLangBlocks(source);
+            const toRemove = blocks.filter(b =>
+              b.langCode.split(/\s+/).some(c => c.toLowerCase() === lang.code.toLowerCase() || c.toLowerCase() === "all")
+            );
+            if (toRemove.length === 0) return;
+            toRemove.reverse().forEach(b =>
+              editor.replaceRange("", editor.offsetToPos(b.start), editor.offsetToPos(b.end))
+            );
+            new Notice((t("notice.deleted") || "Deleted!") + ` (${lang.label})`);
+          }));
+        }
+      });
+
+      picker(t("menu.manual_insert"), "circle-fading-plus", (m) => {
+        const existing = this.detectExistingLanguages(editor);
+        for (const lang of this.settings.languages) {
+          const exists = existing.has(lang.code.toLowerCase());
+          m.addItem((i) => {
+            i.setTitle(exists ? t("menu.existing_lang_prefix", { label: lang.label }) : lang.label);
+            if (exists) { i.setDisabled(true); return; }
+            i.onClick(() => insertLangBlockForLanguage(editor, lang.code));
+          });
+        }
+      });
+
+      plain((s) => s.setTitle(t("menu.smart_insert") || "Smart Insert").setIcon("sparkles").onClick(() => this.smartInsertLanguageBlock(editor)));
+      plain((s) => s.setTitle(t("menu.smart_translate") || "Smart Translation").setIcon("bot").onClick(() => this.openTranslationModal(editor)));
+    });
   }
 
   public extractLanguageContent(source: string, targetLangCode: string): string {
@@ -637,7 +748,10 @@ export default class MultilingualNotesPlugin extends Plugin {
     // Wait, parseLangBlocks already gives us the exact bounds. Let's define langMatch locally just in case.
     const langMatch = (blockLangs: string, target: string) => {
       const lowerTarget = target.toLowerCase();
-      return blockLangs.split(/\s+/).some((code) => code.toLowerCase() === lowerTarget);
+      return blockLangs.split(/\s+/).some((code) => {
+        const lowerCode = code.toLowerCase();
+        return lowerCode === lowerTarget || lowerCode === "all";
+      });
     };
 
     for (const block of blocks) {
@@ -659,6 +773,80 @@ export default class MultilingualNotesPlugin extends Plugin {
     return result;
   }
 
+
+  private normalizeMarkerSpacing(editor: Editor): void {
+    const content = editor.getValue();
+    // Quick bailout: only run on notes that actually contain lang markers.
+    if (!content.includes('li8n')) return;
+
+    const lines = content.split('\n');
+    const insertions: Array<{ line: number; ch: number }> = [];
+    let inCodeFence = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+
+      // Track fenced code blocks so we don't touch marker-like text inside them.
+      if (/^(`{3,}|~{3,})/.test(trimmed)) {
+        inCodeFence = !inCodeFence;
+        continue;
+      }
+      if (inCodeFence) continue;
+
+      const isMarker =
+        matchLanguageBlockOpen(trimmed) !== null ||
+        isLanguageBlockClose(trimmed);
+      if (!isMarker) continue;
+
+      // Needs blank line before?
+      if (i > 0 && lines[i - 1].trim() !== '') {
+        insertions.push({ line: i, ch: 0 });
+      }
+      // Needs blank line after?
+      if (i < lines.length - 1 && lines[i + 1].trim() !== '') {
+        insertions.push({ line: i, ch: lines[i].length });
+      }
+    }
+
+    if (insertions.length === 0) return;
+
+    // Apply bottom-to-top so earlier line numbers stay valid after each insert.
+    insertions.sort((a, b) => b.line - a.line || b.ch - a.ch);
+    for (const { line, ch } of insertions) {
+      editor.replaceRange('\n', { line, ch });
+    }
+  }
+
+  private async syncLi8nFrontmatter(editor: Editor, file: TFile | null): Promise<void> {
+    if (!file) return;
+
+    const content = editor.getValue();
+    const blocks = parseLangBlocks(content);
+    const langs = extractAvailableLanguagesFromBlocks(blocks, this.settings.languages);
+
+    // Map lowercase codes back to the properly-cased codes from settings.
+    const codes = Array.from(langs)
+      .filter(c => c !== 'all')
+      .map(lower => this.settings.languages.find(l => l.code.toLowerCase() === lower)?.code ?? lower)
+      .sort();
+
+    // Use metadata cache to check current value — avoids a disk read.
+    const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const current: string[] = cached?.li8n
+      ? (Array.isArray(cached.li8n) ? [...cached.li8n].map(String).sort() : [String(cached.li8n)])
+      : [];
+
+    if (JSON.stringify(codes) === JSON.stringify(current)) return;
+
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      if (codes.length === 0) {
+        delete fm['li8n'];
+      } else {
+        fm['li8n'] = codes;
+      }
+    });
+  }
+
   private downloadAsFile(filename: string, content: string): void {
     const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -674,11 +862,7 @@ export default class MultilingualNotesPlugin extends Plugin {
 
   private detectExistingLanguages(editor: Editor): Set<string> {
     const blocks = parseLangBlocks(editor.getValue());
-    const existing = new Set<string>();
-    for (const block of blocks) {
-      block.langCode.split(/\s+/).forEach((code) => existing.add(code.toLowerCase()));
-    }
-    return existing;
+    return extractAvailableLanguagesFromBlocks(blocks, this.settings.languages);
   }
 
   private smartInsertLanguageBlock(editor: Editor): void {
@@ -720,7 +904,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     }
 
     const existingLanguages = this.detectExistingLanguages(editor);
-    const modal = new TranslationModal(this.app, this, sourceContent, activeLangCode, existingLanguages);
+    const modal = new TranslationModal(this.app, this, text, activeLangCode, existingLanguages);
     modal.onInsertCallback = (translatedText, targetLangCode) => {
       // Find where to insert. We can use the end of the active block.
       const pos = editor.offsetToPos(activeBlock!.end);
@@ -742,9 +926,17 @@ export default class MultilingualNotesPlugin extends Plugin {
   }
 
   private applyFrontmatterOverride(leaf: WorkspaceLeaf): void {
+    // Never let per-file view preferences interfere with comparison splits —
+    // each leaf in a comparison session has its language set explicitly.
+    if (this.compareManager.isComparisonLeaf(leaf)) return;
+
     const resolved = resolveFrontmatterLanguage(
       leaf,
-      (view) => this.app.metadataCache.getFileCache(view.file!)?.frontmatter?.lang,
+      (view) => {
+        const fm = this.app.metadataCache.getFileCache(view.file!)?.frontmatter;
+        // li8n_view takes priority; fall back to legacy `lang` field.
+        return fm?.li8n_view ?? fm?.lang;
+      },
       this.settings.languages.map((l) => l.code)
     );
     if (!resolved || !resolved.view.file) return;
