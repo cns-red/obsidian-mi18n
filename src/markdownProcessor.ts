@@ -143,7 +143,11 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       const showLangHeader = plugin.settings.showLangHeader;
 
       // Parse (cached) all lang blocks from the full source.
-      const cacheKey = `${ctx.sourcePath}|${source.length}`;
+      // Important: `ctx.getSectionInfo(el).text` is section-scoped, not always the whole
+      // document text. Different sections can have identical lengths, so source-length-only
+      // keys will collide and reuse parsed blocks from the wrong section. That can hide
+      // unrelated content after language switches ("half the note disappears").
+      const cacheKey = `${ctx.sourcePath}|${lineStart}|${lineEnd}|${source.length}`;
       let blocks = blockCache.get(cacheKey);
       if (!blocks) {
         blocks = parseLangBlocks(source);
