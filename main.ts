@@ -151,10 +151,8 @@ export default class MultilingualNotesPlugin extends Plugin {
     const previewRoot = view.containerEl.querySelector(".markdown-preview-view");
     if (!previewRoot) return;
 
-    previewRoot.querySelectorAll<HTMLElement>("[style]").forEach((node) => {
-      if (node.style.display) {
-        node.style.display = "";
-      }
+    previewRoot.querySelectorAll<HTMLElement>(".ml-language-hidden").forEach((node) => {
+      node.classList.remove("ml-language-hidden");
     });
   }
 

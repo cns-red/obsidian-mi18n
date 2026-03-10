@@ -315,9 +315,7 @@
   font-weight: 500;
 }
 
-/* ── Reading mode: hide the fence markers ─────────────────────────────── */
-/* (These are handled inline via style.display = "none" in the processor,
-    but we add a class-based fallback here for robustness.) */
-.ml-fence-hidden {
+/* ── Reading mode: hide the language blocks and fence markers ─────────── */
+.ml-language-hidden {
   display: none !important;
 }

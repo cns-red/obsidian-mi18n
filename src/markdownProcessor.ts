@@ -162,10 +162,10 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       // ── Feature 3: no markers → whole note is the default language ─────────
       if (blocks.length === 0) {
         if (active !== "ALL" && !langMatch(active, defaultLang)) {
-          el.style.display = "none";
+          el.classList.add("ml-language-hidden");
         } else {
           // Reset stale display:none from a previous language/mode state.
-          el.style.display = "";
+          el.classList.remove("ml-language-hidden");
         }
         return;
       }
@@ -182,19 +182,20 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
           // Guard merged paragraph nodes so marker cleanup never removes real content.
           // Side effect: merged marker+content nodes are toggled as one element.
           if (lineEnd > block.openLine) {
-            el.style.display = isActive ? "" : "none";
+            if (isActive) el.classList.remove("ml-language-hidden");
+            else el.classList.add("ml-language-hidden");
             return;
           }
 
           // Normal case: single-line fence element — always hide the raw marker.
           // The language header at the top of the note handles the language indicator.
-          el.style.display = "none";
+          el.classList.add("ml-language-hidden");
           return;
         }
 
         // ② This element IS the close-fence line.
         if (block.closeLine >= 0 && lineStart === block.closeLine) {
-          if (block.closeVisible) el.style.display = "none";
+          if (block.closeVisible) el.classList.add("ml-language-hidden");
           return;
         }
 
@@ -204,9 +205,9 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
         if (afterOpen && beforeClose) {
           const isActive = active === "ALL" || langMatch(block.langCode, active);
           if (!isActive) {
-            el.style.display = "none";
+            el.classList.add("ml-language-hidden");
           } else {
-            el.style.display = "";
+            el.classList.remove("ml-language-hidden");
 
             if (block.closeLine >= 0 && lineEnd >= block.closeLine) {
               removeCloseMarkerFromElement(el);
@@ -217,7 +218,7 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       }
 
       // Element is outside every block — ensure it is visible.
-      el.style.display = "";
+      el.classList.remove("ml-language-hidden");
     },
     // Priority 100 — run after most other processors.
     100
@@ -250,7 +251,7 @@ function removeCloseMarkerFromElement(el: HTMLElement): void {
       n => n !== node && n.textContent?.trim() !== ""
     );
     if (siblings.length === 0) {
-      parent.style.display = "none";
+      parent.classList.add("ml-language-hidden");
     } else {
       node.parentNode?.removeChild(node);
     }
@@ -258,7 +259,7 @@ function removeCloseMarkerFromElement(el: HTMLElement): void {
 
   // Hide the wrapper if removing the marker leaves no visible text.
   if (el.textContent?.trim() === "") {
-    el.style.display = "none";
+    el.classList.add("ml-language-hidden");
   }
 }
 
