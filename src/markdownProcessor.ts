@@ -7,11 +7,33 @@
  */
 
 
-import { MarkdownPostProcessorContext } from "obsidian";
+import { MarkdownPostProcessorContext, MarkdownRenderChild, WorkspaceLeaf } from "obsidian";
 import type MultilingualNotesPlugin from "../main";
 import { isLanguageBlockClose, langCodeIncludes, matchLanguageBlockOpen } from "./syntax";
 
 // ── Marker parsing uses shared helpers in src/syntax.ts ────────────────
+
+// ── Ultra-fast Global Polling Queue for Detached DOM Fragments ─────────
+// Obsidian's virtual scroller generates detached HTML elements and aggressively
+// fires `onload` lifecycles on them BEFORE they are physically mounted to `document.body`.
+// This asynchronous queue safely parks them and evaluates them the exact nanosecond
+// they enter the real DOM, guaranteeing they fetch their language from their true parent Leaf.
+const pendingMountElements = new Set<{ el: HTMLElement, evaluate: () => void }>();
+let isMountPolling = false;
+
+function pollPendingMounts() {
+  if (pendingMountElements.size === 0) {
+    isMountPolling = false;
+    return;
+  }
+  for (const item of pendingMountElements) {
+    if (document.body.contains(item.el)) {
+      item.evaluate();
+      pendingMountElements.delete(item);
+    }
+  }
+  requestAnimationFrame(pollPendingMounts);
+}
 
 // ── Internal data ────────────────────────────────────────────────────────────
 
@@ -53,6 +75,18 @@ const blockCache = new Map<string, LangBlock[]>();
 /** Called from main.ts whenever the active language changes. */
 export function clearBlockCache(): void {
   blockCache.clear();
+}
+
+/** 
+ * Fast string hash to definitively distinguish different documents/embeds 
+ * containing identical total text lengths.
+ */
+function quickHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
+  }
+  return hash;
 }
 
 // ── Language code helpers ─────────────────────────────────────────────────────
@@ -138,87 +172,129 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       if (!info) return; // Can't determine position → leave untouched.
 
       const { text: source, lineStart, lineEnd } = info;
-      const active = plugin.getEffectiveLanguageForPath(ctx.sourcePath);
+      const initialActive = plugin.getLanguageForElement(el, ctx.sourcePath);
       const defaultLang = plugin.settings.defaultLanguage;
       const showLangHeader = plugin.settings.showLangHeader;
 
       // Parse (cached) all lang blocks from the full source.
-      // Important: `ctx.getSectionInfo(el).text` is section-scoped, not always the whole
-      // document text. Different sections can have identical lengths, so source-length-only
-      // keys will collide and reuse parsed blocks from the wrong section. That can hide
-      // unrelated content after language switches ("half the note disappears").
-      const cacheKey = `${ctx.sourcePath}|${lineStart}|${lineEnd}|${source.length}`;
-      let blocks = blockCache.get(cacheKey);
-      if (!blocks) {
-        blocks = parseLangBlocks(source);
-        blockCache.set(cacheKey, blocks);
-      }
+      // Important: Different sections can have identical lengths, so source-length-only
+      // keys will collide in transclusions. Using a hash guarantees uniqueness and prevents
+      // O(n^2) re-parsing of huge documents per chunk.
+      const cacheKey = `${ctx.sourcePath}|${quickHash(source)}`;
+      const blocks = blockCache.get(cacheKey) || (() => {
+        const parsed = parseLangBlocks(source);
+        blockCache.set(cacheKey, parsed);
+        return parsed;
+      })();
 
-      // ── Language header: inject once at top of sizer for multilingual notes ──
-      if (blocks.length > 0 && showLangHeader) {
-        ensureLangHeader(el, blocks, plugin, active);
-      }
+      // Wrap evaluation logic in a reusable closure so it can be re-run firmly
+      // once Obsidian attaches the detached DOM fragment to the correct leaf pane.
+      let evaluateVisibility = (active: string) => {
+        el.classList.remove("ml-language-hidden");
+      };
 
-      // ── Feature 3: no markers → whole note is the default language ─────────
       if (blocks.length === 0) {
-        if (active !== "ALL" && !langMatch(active, defaultLang)) {
-          el.classList.add("ml-language-hidden");
-        } else {
-          // Reset stale display:none from a previous language/mode state.
-          el.classList.remove("ml-language-hidden");
-        }
-        return;
-      }
-
-      // ── Find which block (if any) this element belongs to ─────────────────
-      for (const block of blocks) {
-
-        // ① This element IS the open-fence line.
-        if (lineStart === block.openLine) {
-          if (!block.openVisible) return; // already hidden by Obsidian
-
-          const isActive = active === "ALL" || langMatch(block.langCode, active);
-
-          // Guard merged paragraph nodes so marker cleanup never removes real content.
-          // Side effect: merged marker+content nodes are toggled as one element.
-          if (lineEnd > block.openLine) {
-            if (isActive) el.classList.remove("ml-language-hidden");
-            else el.classList.add("ml-language-hidden");
-            return;
-          }
-
-          // Normal case: single-line fence element — always hide the raw marker.
-          // The language header at the top of the note handles the language indicator.
-          el.classList.add("ml-language-hidden");
-          return;
-        }
-
-        // ② This element IS the close-fence line.
-        if (block.closeLine >= 0 && lineStart === block.closeLine) {
-          if (block.closeVisible) el.classList.add("ml-language-hidden");
-          return;
-        }
-
-        // ③ This element is INSIDE the block (between open and close).
-        const afterOpen = lineStart > block.openLine;
-        const beforeClose = block.closeLine < 0 || lineStart < block.closeLine;
-        if (afterOpen && beforeClose) {
-          const isActive = active === "ALL" || langMatch(block.langCode, active);
-          if (!isActive) {
+        evaluateVisibility = (active: string) => {
+          if (active !== "ALL" && !langMatch(active, defaultLang)) {
             el.classList.add("ml-language-hidden");
           } else {
             el.classList.remove("ml-language-hidden");
-
-            if (block.closeLine >= 0 && lineEnd >= block.closeLine) {
-              removeCloseMarkerFromElement(el);
-            }
           }
-          return;
+        };
+      } else {
+        let foundBlock = false;
+        for (const block of blocks) {
+          if (lineStart === block.openLine) {
+            evaluateVisibility = (active: string) => {
+              if (!block.openVisible) return;
+              const isActive = active === "ALL" || langMatch(block.langCode, active);
+              if (lineEnd > block.openLine) {
+                if (isActive) el.classList.remove("ml-language-hidden");
+                else el.classList.add("ml-language-hidden");
+                return;
+              }
+              el.classList.add("ml-language-hidden");
+            };
+            foundBlock = true; break;
+          }
+
+          if (block.closeLine >= 0 && lineStart === block.closeLine) {
+            evaluateVisibility = (active: string) => {
+              if (block.closeVisible) el.classList.add("ml-language-hidden");
+            };
+            foundBlock = true; break;
+          }
+
+          const afterOpen = lineStart > block.openLine;
+          const beforeClose = block.closeLine < 0 || lineStart < block.closeLine;
+          if (afterOpen && beforeClose) {
+            evaluateVisibility = (active: string) => {
+              const isActive = active === "ALL" || langMatch(block.langCode, active);
+              if (!isActive) {
+                el.classList.add("ml-language-hidden");
+              } else {
+                el.classList.remove("ml-language-hidden");
+                if (block.closeLine >= 0 && lineEnd >= block.closeLine) {
+                  removeCloseMarkerFromElement(el);
+                }
+              }
+            };
+            foundBlock = true; break;
+          }
         }
       }
 
-      // Element is outside every block — ensure it is visible.
-      el.classList.remove("ml-language-hidden");
+      // 1. Initial Synchronous Application: Stops flicker when elements spawn in-bounds.
+      //    Track whether the initial lookup was definitive (element was in the DOM) or
+      //    a best-effort guess (element was detached — virtual-scroller lazy-render).
+      const initialDefinitive = el.isConnected;
+      evaluateVisibility(initialActive);
+      if (blocks.length > 0 && showLangHeader) {
+        ensureLangHeader(el, blocks, plugin, initialActive);
+      }
+
+      // 2. Lifecycle Component: Solves rendering bugs triggered by async chunk scrolling.
+      // Obsidian frequently invokes post-processors while `el` is a detached fragment.
+      // We bind via an asynchronous RequestAnimationFrame queue to guarantee visibility
+      // is locked EXACTLY when `el` is surgically attached to the WorkspaceLeaf DOM.
+      const child = new MarkdownRenderChild(el);
+      const queueItem = {
+        el,
+        evaluate: () => {
+          const mountedActive = plugin.getLanguageForElement(el, ctx.sourcePath);
+          // Always re-evaluate when:
+          //   a) the initial determination was a detached guess (not definitive), OR
+          //   b) the language changed between initial render and mount.
+          // This guarantees that detached elements in a split view are always
+          // corrected to their owning leaf's language, even if the initial guess
+          // happened to produce the same code as the wrong leaf.
+          if (!initialDefinitive || mountedActive !== initialActive) {
+            evaluateVisibility(mountedActive);
+          }
+          // Always refresh the header once genuinely attached to the Leaf.
+          if (blocks.length > 0 && showLangHeader) {
+            ensureLangHeader(el, blocks, plugin, mountedActive);
+          }
+        }
+      };
+
+      child.onload = () => {
+        if (document.body.contains(el)) {
+          queueItem.evaluate();
+        } else {
+          pendingMountElements.add(queueItem);
+          if (!isMountPolling) {
+            isMountPolling = true;
+            requestAnimationFrame(pollPendingMounts);
+          }
+        }
+      };
+
+      child.onunload = () => {
+        pendingMountElements.delete(queueItem);
+      };
+
+      ctx.addChild(child);
     },
     // Priority 100 — run after most other processors.
     100
@@ -275,8 +351,13 @@ function ensureLangHeader(
   plugin: MultilingualNotesPlugin,
   active: string,
 ): void {
-  const owner = el.closest(".markdown-preview-sizer") ?? el.parentElement;
-  if (!owner) return;
+  const owner = el.closest(".markdown-preview-sizer");
+  if (!owner) {
+    // We are running inside a detached document fragment. 
+    // Do not inject headers blindly into random paragraphs! 
+    // The `MarkdownRenderChild.onload` logic will safely inject it later.
+    return;
+  }
 
   // Collect unique language codes present in this document.
   const langCodes = new Set<string>();
@@ -331,10 +412,25 @@ function ensureLangHeader(
   const header = document.createElement("div");
   header.className = "ml-lang-header";
 
+  const onSwitch = (code: string) => {
+    let targetLeaf: WorkspaceLeaf | null = null;
+    plugin.app.workspace.iterateAllLeaves((leaf) => {
+      if (!targetLeaf && leaf.view.containerEl?.contains(owner)) {
+        targetLeaf = leaf;
+      }
+    });
+
+    if (targetLeaf) {
+      plugin.setLanguageForSpecificLeaf(targetLeaf, code);
+    } else {
+      plugin.setLanguageForActiveLeaf(code);
+    }
+  };
+
   // ALL pill — always present when there are multiple language codes.
   if (langCodes.size > 1) {
     header.appendChild(
-      createHeaderPill("ALL", "ALL", active === "ALL", (code) => plugin.setLanguageForActiveFile(code)),
+      createHeaderPill("ALL", "ALL", active === "ALL", onSwitch),
     );
   }
 
@@ -346,7 +442,7 @@ function ensureLangHeader(
     const label = lang ? lang.label : code;
     const isActive = active !== "ALL" && active.toLowerCase() === code.toLowerCase();
     header.appendChild(
-      createHeaderPill(code, label, isActive, (c) => plugin.setLanguageForActiveFile(c)),
+      createHeaderPill(code, label, isActive, onSwitch),
     );
   }
 

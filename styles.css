@@ -37,67 +37,106 @@
   /* Uses Obsidian's default ribbon styling; no overrides needed */
 }
 
-/* ── Reading mode: language header bar ────────────────────────────────── */
+/* ── Reading mode: language header bar — segmented-control (Claude style) ── */
+/*
+ * Renders as a floating pill-track containing the language tabs, identical in
+ * spirit to the Chat / Cowork / Code switcher in the Claude desktop app.
+ * The active segment is lifted with a card shadow; inactive segments are
+ * transparent and inherit the track's muted background.
+ */
 .ml-lang-header {
+  /* Shrink to content width, then centre within the article column */
   display: flex;
+  width: fit-content;
+  margin: 10px auto 16px;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 0 10px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  gap: 2px;
+  padding: 3px;
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 100px;
 }
 
 .ml-lang-pill {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
+  justify-content: center;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.03em;
-  padding: 2px 9px;
-  border-radius: 10px;
-  cursor: pointer;
-  user-select: none;
-  color: var(--text-muted);
-  background: var(--background-secondary);
-  border: 1px solid transparent;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-.ml-lang-pill:hover {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-}
-
-.ml-lang-pill--active {
-  color: var(--interactive-accent);
-  background: rgba(var(--interactive-accent-rgb, 120, 100, 240), 0.12);
-  border-color: var(--interactive-accent);
-}
-
-/* ── Outline panel: language control bar ──────────────────────────────── */
-.ml-outline-lang-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 4px 8px 5px;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.ml-outline-pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 500;
-  padding: 1px 6px;
-  border-radius: 8px;
+  letter-spacing: 0.01em;
+  padding: 4px 16px;
+  border-radius: 100px;
   cursor: pointer;
   user-select: none;
   color: var(--text-muted);
   background: transparent;
-  border: 1px solid var(--background-modifier-border);
-  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+  border: none;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* Only apply hover styling to non-active pills — active one keeps its card look */
+.ml-lang-pill:hover:not(.ml-lang-pill--active) {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+/* Active tab: elevated "card" lifted out of the track */
+.ml-lang-pill--active {
+  color: var(--text-normal);
+  background: var(--background-primary);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.14),
+    0 0 0 0.5px rgba(0, 0, 0, 0.07);
+  font-weight: 600;
+}
+
+.theme-dark .ml-lang-pill--active {
+  background: var(--background-modifier-form-field, var(--background-secondary));
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06);
+}
+
+/* ── Outline panel: language control bar — elegant underline tab strip ─── */
+/*
+ * A full-width strip where each language gets an equal share of the width.
+ * The active language is highlighted with the accent colour and an underline
+ * indicator — a pattern that is immediately readable in even the narrowest panel.
+ */
+.ml-outline-lang-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.ml-outline-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  /* Extra bottom padding compensates for the negative margin below so the
+     text appears vertically centred despite the indicator line. */
+  padding: 7px 4px 5px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  /* The indicator line sits on the bottom edge, overlapping the bar's border */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .ml-outline-pill:hover {
@@ -105,15 +144,273 @@
   background: var(--background-modifier-hover);
 }
 
+/* Active tab: accent colour + underline indicator */
 .ml-outline-pill--active {
   color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
-  background: rgba(var(--interactive-accent-rgb, 120, 100, 240), 0.1);
+  border-bottom-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* Subtle divider between pills (skip after the last one) */
+.ml-outline-pill:not(:last-child) {
+  border-right: 1px solid var(--background-modifier-border);
 }
 
 /* ── Reading mode: active language block wrapper ──────────────────────── */
 .ml-lang-block-active {
   /* Optionally style the visible block container */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Settings page — card-based layout
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Plugin masthead at the very top */
+.ml-settings-masthead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 24px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 24px;
+}
+
+.ml-settings-masthead-icon {
+  font-size: 2em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ml-settings-masthead-text h2 {
+  margin: 0 0 3px;
+  font-size: 1.25em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ml-settings-masthead-text p {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+/* Card section wrapper */
+.ml-settings-section {
+  margin-bottom: 20px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+/* Section header stripe */
+.ml-settings-section-header {
+  padding: 12px 18px 10px;
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ml-settings-section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ml-settings-section-emoji {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.ml-settings-section-heading {
+  margin: 0;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ml-settings-section-desc {
+  margin: 4px 0 0;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Section body */
+.ml-settings-section-body {
+  padding: 0;
+}
+
+/* Remove default top-border on first setting-item; add on the rest */
+.ml-settings-section-body > .setting-item,
+.ml-settings-section-body .ml-lang-list .setting-item {
+  padding: 10px 18px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.ml-settings-section-body > .setting-item:first-child {
+  border-top: none;
+}
+
+/* Active/Default dropdown pair — side by side */
+.ml-settings-drop-row {
+  display: flex;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.ml-settings-drop-row .setting-item {
+  flex: 1;
+  min-width: 220px;
+  border-top: none !important;
+  padding: 10px 18px;
+}
+
+.ml-settings-drop-row .setting-item:not(:last-child) {
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+/* Add-language button row */
+.ml-settings-add-row {
+  padding: 8px 18px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary-alt, var(--background-secondary));
+}
+
+.ml-settings-add-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+
+.ml-settings-add-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ── Syntax reference — tabbed code examples ────────────────────────── */
+
+.ml-syntax-wrap {
+  padding: 14px 18px 16px;
+}
+
+/* Tab bar — same shape as article lang header */
+.ml-syntax-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  width: fit-content;
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 100px;
+  margin-bottom: 14px;
+}
+
+.ml-syntax-tab {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 12px;
+  border-radius: 100px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+
+.ml-syntax-tab:hover:not(.ml-syntax-tab--active) {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.ml-syntax-tab--active {
+  color: var(--text-normal);
+  background: var(--background-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.14), 0 0 0 0.5px rgba(0,0,0,0.07);
+  font-weight: 600;
+}
+
+.theme-dark .ml-syntax-tab--active {
+  background: var(--background-modifier-form-field, var(--background-secondary));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.06);
+}
+
+/* Panes — only the active one is visible */
+.ml-syntax-pane {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ml-syntax-pane--visible {
+  display: flex;
+}
+
+.ml-syntax-note {
+  font-size: 0.82em;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ml-syntax-code {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-x: auto;
+}
+
+.ml-syntax-copy-btn {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 3px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s;
+}
+
+.ml-syntax-copy-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ── No-lang-marker tip ─────────────────────────────────────────────── */
+.ml-settings-tip {
+  margin: 0 18px 14px;
+  padding: 12px 14px;
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+
+.ml-settings-tip-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 0.88em;
+}
+
+.ml-settings-tip-body {
+  margin: 0;
+  font-size: 0.82em;
+  color: var(--text-muted);
+  line-height: 1.6;
 }
 
 /* ── Editing mode: dimmed blocks (when hideInEditor = false) ──────────── */
@@ -203,7 +500,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden; /* Hide modal scrollbar to handle it internally */
+  overflow: hidden;
+  /* Hide modal scrollbar to handle it internally */
 }
 
 /* Dark mode overrides for Glassmorphism */
@@ -239,8 +537,9 @@
   padding: 12px 0;
   border-bottom: 1px solid rgba(var(--background-modifier-border-rgb, 0, 0, 0), 0.05);
 }
+
 .theme-dark .ml-translation-modal .setting-item {
-    border-bottom-color: rgba(255, 255, 255, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.05);
 }
 
 .ml-translate-btn-row {
@@ -254,49 +553,51 @@
   padding: 8px 32px;
   height: auto;
   border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 0,0,0), 0.2);
+  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 0, 0, 0), 0.2);
   transition: transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 .ml-translate-btn-row .mod-cta:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(var(--interactive-accent-rgb, 0,0,0), 0.3);
+  box-shadow: 0 6px 16px rgba(var(--interactive-accent-rgb, 0, 0, 0), 0.3);
 }
 
 /* Preview text area container */
 .ml-translation-preview {
-  flex-grow: 1; /* Take up remaining space */
+  flex-grow: 1;
+  /* Take up remaining space */
   display: flex;
   flex-direction: column;
-  min-height: 200px; /* Ensure a minimum reasonable height */
+  min-height: 200px;
+  /* Ensure a minimum reasonable height */
   margin-bottom: 16px;
 }
 
 .ml-translation-preview textarea {
   flex-grow: 1;
   width: 100%;
-  resize: none; 
+  resize: none;
   font-family: var(--font-text);
   font-size: 1.1em;
   line-height: 1.6;
   padding: 16px;
   border-radius: 12px;
   background: var(--background-primary-alt);
-  background: rgba(var(--background-primary-alt-rgb, 250,250,250), 0.5);
+  background: rgba(var(--background-primary-alt-rgb, 250, 250, 250), 0.5);
   border: 1px solid var(--background-modifier-border);
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.02);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   overflow-y: auto;
 }
 
 .theme-dark .ml-translation-preview textarea {
-    background: rgba(0, 0, 0, 0.2);
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
+  background: rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .ml-translation-preview textarea:focus {
   border-color: var(--interactive-accent);
-  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 0,0,0), 0.2), inset 0 2px 6px rgba(0,0,0,0.02);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 0, 0, 0), 0.2), inset 0 2px 6px rgba(0, 0, 0, 0.02);
   outline: none;
 }
 
@@ -306,7 +607,8 @@
   gap: 12px;
   padding-top: 16px;
   border-top: 1px solid var(--background-modifier-border);
-  margin-top: auto; /* Push to bottom */
+  margin-top: auto;
+  /* Push to bottom */
 }
 
 .ml-action-row button {
@@ -318,4 +620,57 @@
 /* ── Reading mode: hide the language blocks and fence markers ─────────── */
 .ml-language-hidden {
   display: none !important;
+}
+
+/* ── Comparison UI Modal ─────────────────────────────────────────────── */
+.ml-comparison-modal {
+  padding: 12px;
+}
+
+.ml-comparison-modal h2 {
+  font-size: 1.4em;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 8px;
+  text-align: center;
+  color: var(--text-normal);
+}
+
+.ml-comparison-modal .setting-item-description {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.ml-comparison-modal .setting-item {
+  border: none;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(var(--background-modifier-border-rgb, 0, 0, 0), 0.05);
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.ml-comparison-modal .setting-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.ml-comparison-btn-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.ml-comparison-btn-row button {
+  border-radius: 20px;
+  padding: 8px 24px;
+  font-weight: 500;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.ml-comparison-btn-row button.mod-cta {
+  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 0, 0, 0), 0.2);
+}
+
+.ml-comparison-btn-row button:hover {
+  transform: translateY(-1px);
 }

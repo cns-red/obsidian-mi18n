@@ -56,7 +56,7 @@ export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
   aiSystemPrompt: "You are an expert translator. Translate the provided Markdown text into the target language. Output ONLY the translated text, block for block, preserving all Markdown formatting, frontmatter, and code blocks exactly. Do not add any conversational filler or explain your translation.",
 };
 
-// ─── Syntax examples (shown in settings UI and README) ─────────────────────
+// ─── Syntax examples ────────────────────────────────────────────────────────
 
 export const SYNTAX_EXAMPLES = [
   {
@@ -85,7 +85,7 @@ export const SYNTAX_EXAMPLES = [
   },
 ] as const;
 
-// ─── Settings Tab ─────────────────────────────────────────────────────────
+// ─── Settings Tab ──────────────────────────────────────────────────────────
 
 export class MultilingualNotesSettingTab extends PluginSettingTab {
   plugin: MultilingualNotesPlugin;
@@ -98,136 +98,252 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.addClass("ml-settings-root");
 
-    containerEl.createEl("h2", { text: t("settings.title") });
+    // ── Plugin masthead ──────────────────────────────────────────────────
+    const masthead = containerEl.createDiv("ml-settings-masthead");
+    masthead.createEl("div", { cls: "ml-settings-masthead-icon", text: "🌍" });
+    const mastheadText = masthead.createDiv("ml-settings-masthead-text");
+    mastheadText.createEl("h2", { text: "Multilingual Notes · i8n" });
+    mastheadText.createEl("p", { text: t("settings.plugin_tagline") });
 
-    // ── Active Language ──────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(t("settings.active_language_name"))
-      .setDesc(t("settings.active_language_desc"))
-      .addDropdown((drop) => {
-        drop.addOption("ALL", t("menu.show_all_languages"));
-        for (const lang of this.plugin.settings.languages) {
-          drop.addOption(lang.code, lang.label);
-        }
-        drop.setValue(this.plugin.settings.activeLanguage);
-        drop.onChange(async (value) => {
-          await this.plugin.setActiveLanguage(value);
+    // ══ Section 1: Language Library ════════════════════════════════════════
+    this.section(containerEl, "🌐", t("settings.section_languages"), t("settings.section_languages_desc"), (body) => {
+
+      // Language rows
+      const listContainer = body.createDiv("ml-lang-list");
+      this.renderLanguageList(listContainer);
+
+      // Add-language footer row
+      const addRow = body.createDiv("ml-settings-add-row");
+      const addBtn = addRow.createEl("button", {
+        text: "+ " + t("settings.add_language_button"),
+        cls: "ml-settings-add-btn",
+      });
+      addBtn.addEventListener("click", () => {
+        this.plugin.settings.languages.push({ code: "xx", label: "New Language" });
+        this.plugin.saveSettings().then(() => {
+          listContainer.empty();
+          this.renderLanguageList(listContainer);
         });
       });
 
-    // ── Default Language ─────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(t("settings.default_language_name"))
-      .setDesc(t("settings.default_language_desc"))
-      .addDropdown((drop) => {
-        for (const lang of this.plugin.settings.languages) {
-          drop.addOption(lang.code, lang.label);
-        }
-        drop.setValue(this.plugin.settings.defaultLanguage);
-        drop.onChange(async (value) => {
-          this.plugin.settings.defaultLanguage = value;
-          await this.plugin.saveSettings();
-        });
-      });
-
-    // ── Hide in Editor ───────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(t("settings.hide_other_name"))
-      .setDesc(t("settings.hide_other_desc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.hideInEditor);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.hideInEditor = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-        });
-      });
-
-    // ── Language header ──────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(t("settings.show_lang_header_name"))
-      .setDesc(t("settings.show_lang_header_desc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showLangHeader);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showLangHeader = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-        });
-      });
-
-    // ── Ribbon button ────────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(t("settings.show_ribbon_name"))
-      .setDesc(t("settings.show_ribbon_desc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showRibbon);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showRibbon = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshRibbon();
-        });
-      });
-
-    // ── Status bar ───────────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(t("settings.show_status_bar_name"))
-      .setDesc(t("settings.show_status_bar_desc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showStatusBar);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showStatusBar = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshStatusBar();
-        });
-      });
-
-    // ── Language list ────────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: t("settings.configured_languages_title") });
-    containerEl.createEl("p", {
-      text: t("settings.configured_languages_desc"),
-      cls: "setting-item-description",
-    });
-
-    const listContainer = containerEl.createDiv("ml-lang-list");
-    this.renderLanguageList(listContainer);
-
-    new Setting(containerEl)
-      .setName(t("settings.add_language_name"))
-      .addButton((btn) => {
-        btn.setButtonText(t("settings.add_language_button")).onClick(() => {
-          this.plugin.settings.languages.push({ code: "xx", label: "New Language" });
-          this.plugin.saveSettings().then(() => {
-            listContainer.empty();
-            this.renderLanguageList(listContainer);
+      // Active / Default dropdowns (side by side)
+      const dropRow = body.createDiv("ml-settings-drop-row");
+      new Setting(dropRow)
+        .setName(t("settings.active_language_name"))
+        .setDesc(t("settings.active_language_desc"))
+        .addDropdown((drop) => {
+          drop.addOption("ALL", t("menu.show_all_languages"));
+          for (const lang of this.plugin.settings.languages) {
+            drop.addOption(lang.code, lang.label);
+          }
+          drop.setValue(this.plugin.settings.activeLanguage);
+          drop.onChange(async (value) => {
+            await this.plugin.setActiveLanguage(value);
           });
         });
-      });
 
-    // ── Syntax Reference ─────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: t("settings.syntax_title") });
-    containerEl.createEl("p", {
-      text: t("settings.syntax_desc"),
-      cls: "setting-item-description",
+      new Setting(dropRow)
+        .setName(t("settings.default_language_name"))
+        .setDesc(t("settings.default_language_desc"))
+        .addDropdown((drop) => {
+          for (const lang of this.plugin.settings.languages) {
+            drop.addOption(lang.code, lang.label);
+          }
+          drop.setValue(this.plugin.settings.defaultLanguage);
+          drop.onChange(async (value) => {
+            this.plugin.settings.defaultLanguage = value;
+            await this.plugin.saveSettings();
+          });
+        });
     });
 
-    for (const ex of SYNTAX_EXAMPLES) {
-      const wrap = containerEl.createDiv("ml-syntax-example");
+    // ══ Section 2: Interface ═══════════════════════════════════════════════
+    this.section(containerEl, "🎨", t("settings.section_interface"), t("settings.section_interface_desc"), (body) => {
 
-      // Title + note
-      const header = wrap.createDiv("ml-syntax-header");
-      header.createEl("strong", { text: t(ex.titleKey) });
-      header.createEl("span", { text: "  —  " + t(ex.noteKey), cls: "ml-syntax-note" });
+      new Setting(body)
+        .setName(t("settings.show_lang_header_name"))
+        .setDesc(t("settings.show_lang_header_desc"))
+        .addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.showLangHeader);
+          toggle.onChange(async (value) => {
+            this.plugin.settings.showLangHeader = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+          });
+        });
 
-      // Code block
-      const pre = wrap.createEl("pre", { cls: "ml-syntax-code" });
-      const langCode = this.plugin.settings.languages[0]?.code ?? "zh-CN";
+      new Setting(body)
+        .setName(t("settings.hide_other_name"))
+        .setDesc(t("settings.hide_other_desc"))
+        .addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.hideInEditor);
+          toggle.onChange(async (value) => {
+            this.plugin.settings.hideInEditor = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+          });
+        });
+
+      new Setting(body)
+        .setName(t("settings.show_status_bar_name"))
+        .setDesc(t("settings.show_status_bar_desc"))
+        .addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.showStatusBar);
+          toggle.onChange(async (value) => {
+            this.plugin.settings.showStatusBar = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshStatusBar();
+          });
+        });
+
+      new Setting(body)
+        .setName(t("settings.show_ribbon_name"))
+        .setDesc(t("settings.show_ribbon_desc"))
+        .addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.showRibbon);
+          toggle.onChange(async (value) => {
+            this.plugin.settings.showRibbon = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshRibbon();
+          });
+        });
+    });
+
+    // ══ Section 3: AI Translation ══════════════════════════════════════════
+    this.section(containerEl, "🤖", t("settings.ai_translation_title"), t("settings.section_ai_desc"), (body) => {
+
+      new Setting(body)
+        .setName(t("settings.ai_api_base_name"))
+        .setDesc(t("settings.ai_api_base_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("https://api.openai.com/v1")
+            .setValue(this.plugin.settings.aiApiBase)
+            .onChange(async (value) => {
+              this.plugin.settings.aiApiBase = value.trim() || "https://api.openai.com/v1";
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.style.width = "260px";
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_api_key_name"))
+        .setDesc(t("settings.ai_api_key_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("sk-...")
+            .setValue(this.plugin.settings.aiApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.aiApiKey = value.trim();
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.type = "password";
+          text.inputEl.style.width = "260px";
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_model_name"))
+        .setDesc(t("settings.ai_model_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("gpt-4o-mini")
+            .setValue(this.plugin.settings.aiModel)
+            .onChange(async (value) => {
+              this.plugin.settings.aiModel = value.trim() || "gpt-4o-mini";
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.style.width = "200px";
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_system_prompt_name"))
+        .setDesc(t("settings.ai_system_prompt_desc"))
+        .addTextArea((text) => {
+          text
+            .setPlaceholder("You are an expert translator...")
+            .setValue(this.plugin.settings.aiSystemPrompt)
+            .onChange(async (value) => {
+              this.plugin.settings.aiSystemPrompt = value;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.rows = 5;
+          text.inputEl.style.width = "100%";
+          text.inputEl.style.fontFamily = "var(--font-monospace)";
+          text.inputEl.style.fontSize = "12px";
+        });
+    });
+
+    // ══ Section 4: Syntax Reference ════════════════════════════════════════
+    this.section(containerEl, "📖", t("settings.syntax_title"), t("settings.syntax_desc"), (body) => {
+      this.renderSyntaxTabs(body);
+
+      // No-lang-marker tip
+      const tip = body.createDiv("ml-settings-tip");
+      const tipTitle = tip.createDiv("ml-settings-tip-title");
+      tipTitle.createSpan({ text: "💡" });
+      tipTitle.createEl("strong", { text: " " + t("settings.no_marker_title_short") });
+      tip.createEl("p", { text: t("settings.no_marker_desc"), cls: "ml-settings-tip-body" });
+    });
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Creates a card section with a styled header and a body element passed to
+   * the `fill` callback for populating with settings.
+   */
+  private section(
+    parent: HTMLElement,
+    emoji: string,
+    title: string,
+    desc: string,
+    fill: (body: HTMLElement) => void,
+  ): void {
+    const card = parent.createDiv("ml-settings-section");
+
+    const header = card.createDiv("ml-settings-section-header");
+    const titleRow = header.createDiv("ml-settings-section-title-row");
+    titleRow.createSpan({ cls: "ml-settings-section-emoji", text: emoji });
+    titleRow.createEl("h3", { text: title, cls: "ml-settings-section-heading" });
+    if (desc) {
+      header.createEl("p", { text: desc, cls: "ml-settings-section-desc" });
+    }
+
+    const body = card.createDiv("ml-settings-section-body");
+    fill(body);
+  }
+
+  /**
+   * Renders a tabbed view of the four supported syntax styles.
+   * Uses the same segmented-control pill design as the article header.
+   */
+  private renderSyntaxTabs(container: HTMLElement): void {
+    const wrap = container.createDiv("ml-syntax-wrap");
+    const tabBar = wrap.createDiv("ml-syntax-tab-bar");
+    const paneArea = wrap.createDiv("ml-syntax-pane-area");
+
+    const langCode = this.plugin.settings.languages[0]?.code ?? "zh-CN";
+
+    SYNTAX_EXAMPLES.forEach((ex, i) => {
+      const isFirst = i === 0;
+
+      // Tab button (reuses same shape as article pill)
+      const tab = tabBar.createEl("button", {
+        text: t(ex.titleKey),
+        cls: "ml-syntax-tab" + (isFirst ? " ml-syntax-tab--active" : ""),
+      });
+
+      // Pane content
+      const pane = paneArea.createDiv("ml-syntax-pane" + (isFirst ? " ml-syntax-pane--visible" : ""));
+      pane.createEl("p", { text: t(ex.noteKey), cls: "ml-syntax-note" });
+
+      const pre = pane.createEl("pre", { cls: "ml-syntax-code" });
       const sample = `${ex.open.replace("zh-CN", langCode)}\n${t("settings.syntax_sample_content")}\n${ex.close}`;
       pre.createEl("code", { text: sample });
 
-      // Copy button
-      const copyBtn = wrap.createEl("button", {
+      const copyBtn = pane.createEl("button", {
         text: t("settings.copy"),
         cls: "ml-syntax-copy-btn",
       });
@@ -237,72 +353,15 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
           setTimeout(() => { copyBtn.textContent = t("settings.copy"); }, 1500);
         });
       });
-    }
 
-    // ── Tip: no-marker notes ─────────────────────────────────────────────
-    const tipBox = containerEl.createDiv("ml-tip-box");
-    tipBox.createEl("strong", { text: t("settings.no_marker_title") });
-    tipBox.createEl("p", {
-      text: t("settings.no_marker_desc"),
+      // Tab switching
+      tab.addEventListener("click", () => {
+        tabBar.querySelectorAll(".ml-syntax-tab").forEach(t => t.classList.remove("ml-syntax-tab--active"));
+        paneArea.querySelectorAll(".ml-syntax-pane").forEach(p => p.classList.remove("ml-syntax-pane--visible"));
+        tab.classList.add("ml-syntax-tab--active");
+        pane.classList.add("ml-syntax-pane--visible");
+      });
     });
-
-    // ── AI Translation ───────────────────────────────────────────────────
-    containerEl.createEl("h2", { text: t("settings.ai_translation_title") });
-
-    new Setting(containerEl)
-      .setName(t("settings.ai_api_base_name"))
-      .setDesc(t("settings.ai_api_base_desc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("https://api.openai.com/v1")
-          .setValue(this.plugin.settings.aiApiBase)
-          .onChange(async (value) => {
-            this.plugin.settings.aiApiBase = value.trim() || "https://api.openai.com/v1";
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.ai_api_key_name"))
-      .setDesc(t("settings.ai_api_key_desc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("sk-...")
-          .setValue(this.plugin.settings.aiApiKey)
-          .onChange(async (value) => {
-            this.plugin.settings.aiApiKey = value.trim();
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.type = "password";
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.ai_model_name"))
-      .setDesc(t("settings.ai_model_desc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("gpt-4o-mini")
-          .setValue(this.plugin.settings.aiModel)
-          .onChange(async (value) => {
-            this.plugin.settings.aiModel = value.trim() || "gpt-4o-mini";
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.ai_system_prompt_name"))
-      .setDesc(t("settings.ai_system_prompt_desc"))
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("You are an expert translator...")
-          .setValue(this.plugin.settings.aiSystemPrompt)
-          .onChange(async (value) => {
-            this.plugin.settings.aiSystemPrompt = value;
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.rows = 4;
-        text.inputEl.style.width = "100%";
-      });
   }
 
   private renderLanguageList(container: HTMLElement): void {
@@ -320,6 +379,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
               this.plugin.refreshStatusBar();
             });
           text.inputEl.style.width = "90px";
+          text.inputEl.setAttribute("spellcheck", "false");
         })
         .addText((text) => {
           text

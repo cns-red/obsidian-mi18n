@@ -32,22 +32,25 @@ import { buildStatusBar, showLanguageMenu } from "./src/ui/statusBar";
 import { applyOutlineFilter, ensureOutlineControl } from "./src/ui/outlineFilter";
 import { resolveFrontmatterLanguage } from "./src/language-state/frontmatter";
 import { TranslationModal } from "./src/ui/translationModal";
+import { CompareManager } from "./src/compareManager";
 
 export default class MultilingualNotesPlugin extends Plugin {
   settings!: MultilingualNotesSettings;
   private statusBarEl!: HTMLElement;
   private ribbonEl!: HTMLElement;
   private languageRefreshToken = 0;
-  private fileLanguageOverrides = new Map<string, string>();
+  public leafLanguageOverrides = new WeakMap<WorkspaceLeaf, string>();
+  public compareManager!: CompareManager;
 
   async onload(): Promise<void> {
     await this.loadSettings();
     initializeI18n(detectObsidianLocale(this.app));
+    this.compareManager = new CompareManager(this.app, this);
 
     registerReadingModeProcessor(this);
     this.registerEditorExtension(
       buildEditorExtension({
-        getActiveLanguage: () => this.getEffectiveLanguageForActiveFile(),
+        getActiveLanguage: () => this.getEffectiveLanguageForActiveLeaf(),
         getHideMode: () => this.settings.hideInEditor,
       })
     );
@@ -82,6 +85,11 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("layout-change", () => {
+        // Skip global re-render bursts while CompareManager is actively
+        // constructing splits — each new leaf triggers layout-change, and
+        // refreshAllViews() during setup would corrupt the primary leaf's
+        // language state before the secondary leaf overrides are registered.
+        if (this.compareManager.isSettingUp) return;
         clearBlockCache();
         this.refreshAllViews();
         setTimeout(() => this.filterOutlineView(), 0);
@@ -112,13 +120,72 @@ export default class MultilingualNotesPlugin extends Plugin {
     this.filterOutlineView();
   }
 
-  getEffectiveLanguageForPath(path?: string): string {
-    if (!path) return this.settings.activeLanguage;
-    return this.fileLanguageOverrides.get(path) ?? this.settings.activeLanguage;
+  /**
+   * Set immediately before calling newLeaf.openFile() in CompareManager so that
+   * post-processors running synchronously during that call can use it as a hint
+   * for detached elements (before they are mounted to a leaf's DOM).
+   * Always null outside of a compare-leaf spawn.
+   */
+  spawningLanguage: string | null = null;
+
+  getEffectiveLanguageForLeaf(leaf: WorkspaceLeaf | null): string {
+    if (!leaf) return this.settings.activeLanguage;
+    return this.leafLanguageOverrides.get(leaf) ?? this.settings.activeLanguage;
   }
 
-  getEffectiveLanguageForActiveFile(): string {
-    return this.getEffectiveLanguageForPath(this.app.workspace.getActiveFile()?.path);
+  getEffectiveLanguageForActiveLeaf(): string {
+    const leaf = this.app.workspace.getMostRecentLeaf();
+    return this.getEffectiveLanguageForLeaf(leaf);
+  }
+
+  getLanguageForElement(el: HTMLElement, sourcePath?: string): string {
+    // ── 1. Element is genuinely in the DOM ──────────────────────────────────
+    // Walk all leaves and use contains() to find the owning leaf.
+    // This is the reliable path; it works regardless of how deeply nested
+    // leaf.view.containerEl is relative to the .workspace-leaf root.
+    if (el.isConnected) {
+      let foundLeaf: WorkspaceLeaf | null = null;
+      this.app.workspace.iterateAllLeaves((leaf) => {
+        if (!foundLeaf && leaf.view.containerEl?.contains(el)) {
+          foundLeaf = leaf;
+        }
+      });
+      if (foundLeaf) return this.getEffectiveLanguageForLeaf(foundLeaf);
+    }
+
+    // ── 2. Element is detached (virtual-scroller lazy-render) ───────────────
+    // The polling queue in markdownProcessor.ts will re-evaluate once mounted.
+    // Use available hints to make the best initial guess and minimise flicker.
+
+    // 2a. Active compare-leaf spawn — the plugin sets this before openFile().
+    if (this.spawningLanguage) {
+      return this.spawningLanguage;
+    }
+
+    // 2b. Exactly one leaf has this file open — unambiguous.
+    if (sourcePath) {
+      const leaves = this.app.workspace.getLeavesOfType("markdown")
+        .filter(l => (l.view as any).file?.path === sourcePath);
+      if (leaves.length === 1) {
+        return this.getEffectiveLanguageForLeaf(leaves[0]);
+      }
+      if (leaves.length > 1) {
+        // Multiple splits of the same file (compare session).
+        // Use the most-recently-focused split as a best-effort guess;
+        // the polling queue will correct any mismatch once the element mounts.
+        const recentLeaf = this.app.workspace.getMostRecentLeaf();
+        if (recentLeaf && leaves.includes(recentLeaf)) {
+          return this.getEffectiveLanguageForLeaf(recentLeaf);
+        }
+        // recentLeaf is outside our splits — fall back to the first split.
+        return this.getEffectiveLanguageForLeaf(leaves[0]);
+      }
+    }
+
+    // ── 3. Absolute fallback ────────────────────────────────────────────────
+    const activeLeaf = this.app.workspace.getMostRecentLeaf();
+    if (activeLeaf) return this.getEffectiveLanguageForLeaf(activeLeaf);
+    return this.settings.activeLanguage;
   }
 
   private resolveLanguageCode(code: string): string {
@@ -127,16 +194,51 @@ export default class MultilingualNotesPlugin extends Plugin {
     return matched?.code ?? code;
   }
 
-  async setLanguageForActiveFile(code: string): Promise<void> {
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) return;
+  async setLanguageForSpecificLeaf(leaf: WorkspaceLeaf, code: string): Promise<void> {
+    const resolvedCode = this.resolveLanguageCode(code);
+    this.leafLanguageOverrides.set(leaf, resolvedCode);
 
-    this.fileLanguageOverrides.set(activeFile.path, this.resolveLanguageCode(code));
-    clearBlockCache();
+    // Immediately force all UI pills inside this leaf to visually update.
+    // This bypasses Obsidian's async chunk caching mechanics which may drop detached chunks.
+    if (leaf.view && leaf.view.containerEl) {
+      const pills = leaf.view.containerEl.querySelectorAll(".ml-lang-pill, .ml-outline-pill");
+      pills.forEach((pill) => {
+        const pillCode = pill.getAttribute("data-lang");
+        if (!pillCode) return;
+        const isActive = (resolvedCode === "ALL") ? pillCode === "ALL" : resolvedCode.toLowerCase() === pillCode.toLowerCase();
+        if (isActive) {
+          if (pill.classList.contains("ml-outline-pill")) {
+            pill.classList.add("ml-outline-pill--active");
+          } else {
+            pill.classList.add("ml-lang-pill--active");
+          }
+        } else {
+          pill.classList.remove("ml-outline-pill--active", "ml-lang-pill--active");
+        }
+      });
+    }
+
+    // Only re-render the exact leaf that changed language.
+    // We explicitly avoid calling clearBlockCache() and refreshAllViews() here to 
+    // strictly isolate independent compare splits.
+    if (leaf.view instanceof MarkdownView && leaf.view.getMode() === "preview") {
+      leaf.view.previewMode.rerender(true);
+      // Ensures that any heavily bogged async updates settle their post-processors
+      setTimeout(() => {
+        if (leaf.view instanceof MarkdownView && leaf.view.getMode() === "preview") {
+          leaf.view.previewMode.rerender(true);
+        }
+      }, 150);
+    }
+
     this.refreshStatusBar();
-    this.refreshAllViews();
-    this.scheduleStabilizedRefresh();
     this.filterOutlineView();
+  }
+
+  async setLanguageForActiveLeaf(code: string): Promise<void> {
+    const leaf = this.app.workspace.getMostRecentLeaf();
+    if (!leaf) return;
+    return this.setLanguageForSpecificLeaf(leaf, code);
   }
 
   private scheduleStabilizedRefresh(): void {
@@ -167,7 +269,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       }
       const cm = (view.editor as any)?.cm as any;
       if (cm && typeof cm.dispatch === "function") {
-        cm.dispatch({ effects: [setActiveLangEffect.of(this.getEffectiveLanguageForPath(view.file?.path))] });
+        cm.dispatch({ effects: [setActiveLangEffect.of(this.getEffectiveLanguageForLeaf(leaf))] });
       }
     });
   }
@@ -185,11 +287,11 @@ export default class MultilingualNotesPlugin extends Plugin {
     };
 
     const activeFile = this.app.workspace.getActiveFile();
-    const active = this.getEffectiveLanguageForActiveFile();
+    const active = this.getEffectiveLanguageForActiveLeaf();
 
     if (!activeFile) {
       ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
-        await this.setLanguageForActiveFile(code);
+        await this.setLanguageForActiveLeaf(code);
       }, active, new Set()); // Hide pills if no active file
       resetAll();
       return;
@@ -216,7 +318,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       }
 
       ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
-        await this.setLanguageForActiveFile(code);
+        await this.setLanguageForActiveLeaf(code);
       }, active, normalizedPresentCodes);
 
       if (active === "ALL" || !headings || headings.length === 0) {
@@ -241,7 +343,39 @@ export default class MultilingualNotesPlugin extends Plugin {
   refreshStatusBar(): void {
     this.statusBarEl.style.display = this.settings.showStatusBar ? "" : "none";
     if (this.settings.showStatusBar) {
-      buildStatusBar(this.statusBarEl, this.settings, (evt: MouseEvent) => this.showLanguageMenu(evt), this.getEffectiveLanguageForActiveFile());
+      buildStatusBar(
+        this.statusBarEl,
+        this.settings,
+        () => {
+          import("./src/ui/compareModal").then(({ ComparisonModal }) => {
+            const activeFile = this.app.workspace.getActiveFile();
+            if (!activeFile) return;
+
+            const openModal = (source: string) => {
+              const blocks = parseLangBlocks(source);
+              const s = new Set<string>();
+              blocks.forEach(b => b.langCode.split(/\s+/).filter(Boolean).forEach(c => s.add(c.toLowerCase())));
+              const parsedCodes = Array.from(s);
+              const selectedLangs = this.compareManager.getActiveComparisonLanguages();
+              if (selectedLangs.size === 0) {
+                selectedLangs.add(this.getEffectiveLanguageForActiveLeaf());
+              }
+              new ComparisonModal(this.app, this, selectedLangs, parsedCodes).open();
+            };
+
+            // Try the editor first (available in edit mode and sometimes preview mode).
+            // Fall back to a vault read — required when the note is in reading/preview
+            // mode only (editor.getValue() returns undefined or the view is absent).
+            const editorText = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor?.getValue();
+            if (editorText != null) {
+              openModal(editorText);
+            } else {
+              this.app.vault.cachedRead(activeFile).then(openModal);
+            }
+          });
+        },
+        this.getEffectiveLanguageForActiveLeaf()
+      );
     }
   }
 
@@ -483,7 +617,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     );
     if (!resolved || !resolved.view.file) return;
 
-    this.fileLanguageOverrides.set(resolved.view.file.path, this.resolveLanguageCode(resolved.lang));
+    this.leafLanguageOverrides.set(leaf, this.resolveLanguageCode(resolved.lang));
     this.refreshStatusBar();
     // Guard by mode so preview refresh never touches editor APIs.
     // Side effect: only the current leaf is refreshed during override application.

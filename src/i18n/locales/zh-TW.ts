@@ -14,6 +14,10 @@ const zhTW = {
         manual_insert: "手動插入語言塊",
         smart_translate: "智能 AI 翻譯",
         existing_lang_prefix: "✓ {label}",
+        compare_languages: "語言比對閱讀",
+        compare_languages_desc: "選擇多個語言以打開並排同步滾動的比對視圖。",
+        apply_comparison: "應用分屏比對",
+        return_normal: "回到單一模式",
     },
     command: {
         switch_language: "切換語言：{label}",

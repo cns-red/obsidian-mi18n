@@ -14,6 +14,10 @@ const ja = {
         manual_insert: "言語ブロックを手動で挿入",
         smart_translate: "スマート AI 翻訳",
         existing_lang_prefix: "✓ {label}",
+        compare_languages: "言語比較",
+        compare_languages_desc: "複数の言語を選択して、並行して同期スクロールするビューを開きます。",
+        apply_comparison: "分割ビューを適用",
+        return_normal: "通常モードに戻る",
     },
     command: {
         switch_language: "言語を切り替える：{label}",
