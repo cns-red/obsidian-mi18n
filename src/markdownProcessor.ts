@@ -58,9 +58,10 @@ function quickHash(str: string): number {
   return hash;
 }
 
-/** Case-insensitive match; "ALL" matches everything. */
+/** Case-insensitive match; active "ALL" or block tagged "all" both show in every view. */
 export function langMatch(blockLang: string, active: string): boolean {
   if (active === "ALL") return true;
+  if (langCodeIncludes(blockLang, "all")) return true;
   return langCodeIncludes(blockLang, active);
 }
 

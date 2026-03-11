@@ -486,17 +486,7 @@ export default class MultilingualNotesPlugin extends Plugin {
   }
 
   refreshStatusBar(): void {
-    if (!this.settings.showStatusBar) {
-      this.statusBarEl.style.display = "none";
-      return;
-    }
-    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeView || !activeFile || activeFile.extension !== "md") {
-      this.statusBarEl.style.display = "none";
-      return;
-    }
-    this.statusBarEl.style.display = "";
+    this.statusBarEl.style.display = this.settings.showStatusBar ? "" : "none";
     if (this.settings.showStatusBar) {
       buildStatusBar(
         this.statusBarEl,
