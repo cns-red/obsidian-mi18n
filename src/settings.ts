@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Notice } from "obsidian";
+import {App, PluginSettingTab, Setting, Notice, setIcon} from "obsidian";
 import type MultilingualNotesPlugin from "../main";
 import { t } from "./i18n";
 
@@ -89,24 +89,24 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
     // ── Plugin masthead ──────────────────────────────────────────────────
     const masthead = containerEl.createDiv("ml-settings-masthead");
-    masthead.createEl("div", { cls: "ml-settings-masthead-icon", text: "🌍" });
+    masthead.createEl("div", { cls: "ml-settings-masthead-icon", text: "" });
     const mastheadText = masthead.createDiv("ml-settings-masthead-text");
     mastheadText.createEl("h2", { text: "Multilingual Notes · li8n" });
     mastheadText.createEl("p", { text: t("settings.plugin_tagline") });
 
     // ══ Section 1: Language Library ════════════════════════════════════════
-    this.section(containerEl, "🌐", t("settings.section_languages"), t("settings.section_languages_desc"), (body) => {
+    this.section(containerEl, "languages", t("settings.section_languages"), t("settings.section_languages_desc"), (body) => {
 
       // Language rows
-      const listContainer = body.createDiv("ml-lang-list");
-      this.renderLanguageList(listContainer);
+        const listContainer = body.createDiv("ml-lang-list");
+        this.renderLanguageList(listContainer);
 
       // Add-language footer row
-      const addRow = body.createDiv("ml-settings-add-row");
-      const addBtn = addRow.createEl("button", {
-        text: "+ " + t("settings.add_language_button"),
-        cls: "ml-settings-add-btn",
-      });
+        const addRow = body.createDiv("ml-settings-add-row");
+        const addBtn = addRow.createEl("button", {
+            text: "+ " + t("settings.add_language_button"),
+            cls: "ml-settings-add-btn",
+        });
       addBtn.addEventListener("click", () => {
         this.plugin.settings.languages.push({ code: "xx", label: "New Language" });
         this.plugin.saveSettings().then(() => {
@@ -147,7 +147,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     });
 
     // ══ Section 2: Interface ═══════════════════════════════════════════════
-    this.section(containerEl, "🎨", t("settings.section_interface"), t("settings.section_interface_desc"), (body) => {
+    this.section(containerEl, "gamepad-directional", t("settings.section_interface"), t("settings.section_interface_desc"), (body) => {
 
       new Setting(body)
         .setName(t("settings.show_lang_header_name"))
@@ -199,7 +199,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     });
 
     // ══ Section 3: AI Translation ══════════════════════════════════════════
-    this.section(containerEl, "🤖", t("settings.ai_translation_title"), t("settings.section_ai_desc"), (body) => {
+    this.section(containerEl, "bot-message-square", t("settings.ai_translation_title"), t("settings.section_ai_desc"), (body) => {
 
       new Setting(body)
         .setName(t("settings.ai_api_base_name"))
@@ -263,19 +263,19 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     });
 
     // ══ Section 4: Syntax Reference ════════════════════════════════════════
-    this.section(containerEl, "📖", t("settings.syntax_title"), t("settings.syntax_desc"), (body) => {
+    this.section(containerEl, "terminal", t("settings.syntax_title"), t("settings.syntax_desc"), (body) => {
       this.renderSyntaxTabs(body);
 
       // No-lang-marker tip
       const tip = body.createDiv("ml-settings-tip");
       const tipTitle = tip.createDiv("ml-settings-tip-title");
-      tipTitle.createSpan({ text: "💡" });
+      tipTitle.createSpan({ text: "Tip" });
       tipTitle.createEl("strong", { text: " " + t("settings.no_marker_title_short") });
       tip.createEl("p", { text: t("settings.no_marker_desc"), cls: "ml-settings-tip-body" });
     });
 
     // ══ Section 5: Scope ══════════════════════════════════════════════════
-    this.section(containerEl, "🗂️", t("settings.section_scope"), t("settings.section_scope_desc"), (body) => {
+    this.section(containerEl, "folder-search", t("settings.section_scope"), t("settings.section_scope_desc"), (body) => {
       this.renderScopeGroup(body, t("settings.scope_work_dirs_name"), t("settings.scope_work_dirs_hint"), "workDirs");
       this.renderScopeGroup(body, t("settings.scope_excl_dirs_name"), t("settings.scope_excl_dirs_hint"), "excludeDirs");
     });
@@ -312,7 +312,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
    */
   private section(
     parent: HTMLElement,
-    emoji: string,
+    iconId: string,
     title: string,
     desc: string,
     fill: (body: HTMLElement) => void,
@@ -321,7 +321,8 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
     const header = card.createDiv("ml-settings-section-header");
     const titleRow = header.createDiv("ml-settings-section-title-row");
-    titleRow.createSpan({ cls: "ml-settings-section-emoji", text: emoji });
+    const titleIcon = titleRow.createDiv("ml-settings-section-title-icon");
+    setIcon(titleIcon, iconId)
     titleRow.createEl("h3", { text: title, cls: "ml-settings-section-heading" });
     if (desc) {
       header.createEl("p", { text: desc, cls: "ml-settings-section-desc" });
@@ -358,17 +359,6 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
       const pre = pane.createEl("pre", { cls: "ml-syntax-code" });
       const sample = `${ex.open.replace("zh-CN", langCode)}\n${t("settings.syntax_sample_content")}\n${ex.close}`;
       pre.createEl("code", { text: sample });
-
-      const copyBtn = pane.createEl("button", {
-        text: t("settings.copy"),
-        cls: "ml-syntax-copy-btn",
-      });
-      copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(sample).then(() => {
-          copyBtn.textContent = t("settings.copied");
-          setTimeout(() => { copyBtn.textContent = t("settings.copy"); }, 1500);
-        });
-      });
 
       // Tab switching
       tab.addEventListener("click", () => {

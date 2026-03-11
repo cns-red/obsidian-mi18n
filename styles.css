@@ -222,14 +222,14 @@
 /* Section header stripe */
 .ml-settings-section-header {
   padding: 12px 18px 10px;
-  background: var(--background-secondary-alt, var(--background-secondary));
+  background: var(--background-secondary-alt);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .ml-settings-section-title-row {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: start;
+  justify-items: center;
 }
 
 .ml-settings-section-emoji {
@@ -285,23 +285,23 @@
   border-right: 1px solid var(--background-modifier-border);
 }
 
-/* Add-language button row */
+.ml-lang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .ml-settings-add-row {
-  padding: 8px 18px;
-  border-top: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary-alt, var(--background-secondary));
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px;
 }
 
 .ml-settings-add-btn {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-muted);
-  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+  padding: 4px 12px;
+  font-size: 13px;
+  border-radius: 999px;
+  margin: 2px;
 }
 
 .ml-settings-add-btn:hover {
@@ -323,7 +323,7 @@
   gap: 2px;
   padding: 3px;
   width: fit-content;
-  background: var(--background-secondary-alt, var(--background-secondary));
+  background: var(--background-secondary-alt);
   border: 1px solid var(--background-modifier-border);
   border-radius: 100px;
   margin-bottom: 14px;
@@ -409,7 +409,7 @@
 .ml-settings-tip {
   margin: 0 18px 14px;
   padding: 12px 14px;
-  background: var(--background-secondary-alt, var(--background-secondary));
+  background: var(--background-secondary-alt);
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
 }
@@ -836,7 +836,7 @@
 
 /* ── Scope section ─────────────────────────────────────────────────────── */
 .ml-scope-group {
-  margin: 0 0 18px;
+  margin: 18px;
 }
 
 .ml-scope-group-header {

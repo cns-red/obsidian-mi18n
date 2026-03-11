@@ -35,7 +35,7 @@ export function buildStatusBar(
   wrapper.onclick = onLanguageClick;
 
   const compareBtn = statusBarEl.createDiv("ml-status-compare-btn");
-  setIcon(compareBtn, "columns-4");
+  setIcon(compareBtn, "flip-horizontal-2");
   compareBtn.setAttribute("title", t("menu.compare_languages"));
   compareBtn.style.cursor = "pointer";
   compareBtn.style.marginLeft = "6px";
