@@ -142,6 +142,8 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
   plugin.registerMarkdownPostProcessor(
     (el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
       if (!plugin.isFileInScope(ctx.sourcePath)) return;
+      const selfFile = plugin.app.vault.getFileByPath(ctx.sourcePath);
+      if (selfFile && plugin.app.metadataCache.getFileCache(selfFile)?.frontmatter?.li8n_ignore === true) return;
       const info = ctx.getSectionInfo(el);
       if (!info) return;
 
