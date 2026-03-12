@@ -91,7 +91,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     const masthead = containerEl.createDiv("ml-settings-masthead");
     masthead.createEl("div", { cls: "ml-settings-masthead-icon", text: "" });
     const mastheadText = masthead.createDiv("ml-settings-masthead-text");
-    mastheadText.createEl("h2", { text: "Internationalization for Markdown · mi18n" });
+    mastheadText.createEl("div", { text: "Internationalization for Markdown · mi18n", cls: "ml-settings-masthead-heading" });
     mastheadText.createEl("p", { text: t("settings.plugin_tagline") });
 
     // ══ Section 1: Language Library ════════════════════════════════════════
@@ -109,7 +109,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
         });
       addBtn.addEventListener("click", () => {
         this.plugin.settings.languages.push({ code: "xx", label: "New Language" });
-        this.plugin.saveSettings().then(() => {
+        void this.plugin.saveSettings().then(() => {
           listContainer.empty();
           this.renderLanguageList(listContainer);
         });
@@ -220,6 +220,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
         .setDesc(t("settings.ai_api_key_desc"))
         .addText((text) => {
           text
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             .setPlaceholder("sk-...")
             .setValue(this.plugin.settings.aiApiKey)
             .onChange(async (value) => {
@@ -235,6 +236,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
         .setDesc(t("settings.ai_model_desc"))
         .addText((text) => {
           text
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             .setPlaceholder("gpt-4o-mini")
             .setValue(this.plugin.settings.aiModel)
             .onChange(async (value) => {
@@ -283,7 +285,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
 
     const brand = footer.createDiv("ml-settings-footer-brand");
     brand.createEl("p", {
-      text: "mi18n · Internationalization for Markdown",
+      text: "Internationalization for Markdown · mi18n",
       cls: "ml-settings-footer-tagline",
     });
 
@@ -445,7 +447,7 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     });
     addBtn.addEventListener("click", () => {
       this.plugin.settings[field].push("");
-      this.plugin.saveSettings().then(() => this.renderDirList(listEl, field));
+      this.plugin.saveSettings().then(() => this.renderDirList(listEl, field)).catch(console.error);
     });
   }
 

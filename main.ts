@@ -25,6 +25,7 @@ import {
   parseLangBlocks,
   extractAvailableLanguagesFromBlocks,
   langMatch,
+  sweepSectionVisibility,
 } from "./src/markdownProcessor";
 import { buildEditorExtension, setActiveLangEffect } from "./src/editorExtension";
 import { matchLanguageBlockOpen, isLanguageBlockClose } from "./src/syntax";
@@ -45,7 +46,6 @@ export default class MultilingualNotesPlugin extends Plugin {
   settings!: MultilingualNotesSettings;
   private statusBarEl!: HTMLElement;
   private ribbonEl!: HTMLElement;
-  private languageRefreshToken = 0;
   public leafLanguageOverrides = new WeakMap<WorkspaceLeaf, { code: string, filePath: string }>();
   public compareManager!: CompareManager;
   /** Tracks each MarkdownView's last-known mode to detect edit→preview transitions. */
@@ -75,7 +75,6 @@ export default class MultilingualNotesPlugin extends Plugin {
     this.refreshRibbon();
 
     this.statusBarEl = this.addStatusBarItem();
-    this.statusBarEl.style.order = "999";
     this.statusBarEl.addClass("ml-status-bar");
     this.refreshStatusBar();
 
@@ -172,7 +171,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       this.app.workspace.on("layout-change", () => {
         this.app.workspace.iterateAllLeaves((leaf) => {
           if (!(leaf.view instanceof MarkdownView)) return;
-          const view = leaf.view as MarkdownView;
+          const view = leaf.view;
           const mode = view.getMode();
           const prev = this._viewModes.get(view);
           this._viewModes.set(view, mode);
@@ -190,7 +189,7 @@ export default class MultilingualNotesPlugin extends Plugin {
   onunload(): void { }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MultilingualNotesSettings>);
     if (!this.settings.languages || this.settings.languages.length === 0) {
       this.settings.languages = DEFAULT_SETTINGS.languages;
     }
@@ -214,10 +213,8 @@ export default class MultilingualNotesPlugin extends Plugin {
   async setActiveLanguage(code: string): Promise<void> {
     this.settings.activeLanguage = this.resolveLanguageCode(code);
     await this.saveSettings();
-    clearBlockCache();
     this.refreshStatusBar();
-    this.refreshAllViews();
-    this.scheduleStabilizedRefresh();
+    this.applyLanguageSweep();
     this.filterOutlineView();
   }
 
@@ -269,8 +266,9 @@ export default class MultilingualNotesPlugin extends Plugin {
     const activeFile = this.app.workspace.getActiveFile();
     if (activeFile) {
       const fm = this.app.metadataCache.getFileCache(activeFile)?.frontmatter;
-      const langCodes: string[] = fm?.lang
-          ? (Array.isArray(fm.lang) ? fm.lang : [String(fm.lang)])
+      const langRaw = fm?.lang as unknown;
+      const langCodes: string[] = langRaw
+          ? (Array.isArray(langRaw) ? (langRaw as unknown[]).map(String) : [String(langRaw)])
           : [];
       // frontmatter 无 lang 字段 → 不是多语言笔记，不提示
       if (langCodes.length === 0) return false;
@@ -307,7 +305,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     // 2b. Exactly one leaf has this file open — unambiguous.
     if (sourcePath) {
       const leaves = this.app.workspace.getLeavesOfType("markdown")
-        .filter(l => (l.view as any).file?.path === sourcePath);
+        .filter(l => (l.view as unknown as { file?: { path: string } }).file?.path === sourcePath);
       if (leaves.length === 1) {
         return this.getEffectiveLanguageForLeaf(leaves[0]);
       }
@@ -368,17 +366,22 @@ export default class MultilingualNotesPlugin extends Plugin {
       });
     }
 
-    // Only re-render the exact leaf that changed language.
-    // We explicitly avoid calling clearBlockCache() and refreshAllViews() here to 
-    // strictly isolate independent compare splits.
-    if (leaf.view instanceof MarkdownView && leaf.view.getMode() === "preview") {
-      leaf.view.previewMode.rerender(true);
-      // Ensures that any heavily bogged async updates settle their post-processors
-      setTimeout(() => {
-        if (leaf.view instanceof MarkdownView && leaf.view.getMode() === "preview") {
-          leaf.view.previewMode.rerender(true);
+    // Apply to the exact leaf only — never touch other leaves to keep compare splits isolated.
+    // Sweep is sufficient: it immediately updates every section already in the DOM.
+    // Sections not yet rendered (virtual-scroller lazy load) will pick up the correct
+    // language from getLanguageForElement when the post-processor runs on first entry.
+    // rerender(true) is intentionally omitted — it clears all rendered sections and restarts
+    // async rendering, which causes the "empty or half content" flash on long notes.
+    if (leaf.view instanceof MarkdownView) {
+      if (leaf.view.getMode() === "preview") {
+        const previewEl = leaf.view.containerEl.querySelector(".markdown-preview-view");
+        if (previewEl) sweepSectionVisibility(previewEl, resolvedCode);
+      } else {
+        const cm = (leaf.view.editor as unknown as { cm?: { dispatch: (tr: unknown) => void } })?.cm;
+        if (cm && typeof cm.dispatch === "function") {
+          cm.dispatch({ effects: [setActiveLangEffect.of(resolvedCode)] });
         }
-      }, 150);
+      }
     }
 
     this.refreshStatusBar();
@@ -391,20 +394,24 @@ export default class MultilingualNotesPlugin extends Plugin {
     this.setLanguageForSpecificLeaf(leaf, code);
   }
 
-  private scheduleStabilizedRefresh(): void {
-    const token = ++this.languageRefreshToken;
-    setTimeout(() => {
-      if (token !== this.languageRefreshToken) return;
-      this.refreshAllViews();
-    }, 80);
-  }
-
-  private resetPreviewDisplayState(view: MarkdownView): void {
-    const previewRoot = view.containerEl.querySelector(".markdown-preview-view");
-    if (!previewRoot) return;
-
-    previewRoot.querySelectorAll<HTMLElement>(".ml-language-hidden").forEach((node) => {
-      node.classList.remove("ml-language-hidden");
+  /**
+   * Directly re-apply visibility to every in-DOM section across all leaves without triggering
+   * a full rerender. Used for language switches where rerender(true) would clear all rendered
+   * sections and restart async rendering — causing empty / half-content on long notes.
+   */
+  private applyLanguageSweep(): void {
+    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) return;
+      if (view.getMode() === "preview") {
+        const previewEl = view.containerEl.querySelector(".markdown-preview-view");
+        if (previewEl) sweepSectionVisibility(previewEl, this.getEffectiveLanguageForLeaf(leaf));
+        return;
+      }
+      const cm = (view.editor as unknown as { cm?: { dispatch: (tr: unknown) => void } })?.cm;
+      if (cm && typeof cm.dispatch === "function") {
+        cm.dispatch({ effects: [setActiveLangEffect.of(this.getEffectiveLanguageForLeaf(leaf))] });
+      }
     });
   }
 
@@ -413,7 +420,10 @@ export default class MultilingualNotesPlugin extends Plugin {
       const view = leaf.view;
       if (!(view instanceof MarkdownView)) return;
       if (view.getMode() === "preview") {
-        this.resetPreviewDisplayState(view);
+        const previewEl = view.containerEl.querySelector(".markdown-preview-view");
+        if (previewEl) {
+          sweepSectionVisibility(previewEl, this.getEffectiveLanguageForLeaf(leaf));
+        }
         view.previewMode.rerender(true);
         return;
       }
@@ -440,8 +450,8 @@ export default class MultilingualNotesPlugin extends Plugin {
     const active = this.getEffectiveLanguageForActiveLeaf();
 
     if (!activeFile || !this.isFileInScope(activeFile.path)) {
-      ensureOutlineControl(outlineLeaves, this.settings, async (code) => {
-        await this.setLanguageForActiveLeaf(code);
+      ensureOutlineControl(outlineLeaves, this.settings, (code) => {
+        this.setLanguageForActiveLeaf(code);
       }, active, new Set());
       resetAll();
       return;
@@ -574,7 +584,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     this.addCommand({
       id: "cycle-language",
       name: t("command.cycle_next"),
-      callback: () => { void this.cycleLanguage(); },
+      callback: () => { this.cycleLanguage(); },
     });
 
     this.addCommand({
@@ -635,13 +645,13 @@ export default class MultilingualNotesPlugin extends Plugin {
     editor.replaceRange(lines.join("\n"), editor.getCursor());
   }
 
-  private async cycleLanguage(): Promise<void> {
+  private cycleLanguage(): void {
     const codes = this.settings.languages.map((l) => l.code);
     const currentLang = this.getEffectiveLanguageForActiveLeaf();
     const idx = codes.findIndex((c) => c.toLowerCase() === currentLang.toLowerCase());
     const next = idx === -1 || idx === codes.length - 1 ? codes[0] : codes[idx + 1];
 
-    await this.setLanguageForActiveLeaf(next);
+    this.setLanguageForActiveLeaf(next);
 
     const label = this.settings.languages.find((l) => l.code === next)?.label ?? next;
     new Notice(t("notice.current_language", { label }));
@@ -867,17 +877,19 @@ export default class MultilingualNotesPlugin extends Plugin {
 
     // Use metadata cache to check current value — avoids a disk read.
     const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-    const current: string[] = cached?.lang
-      ? (Array.isArray(cached.lang) ? [...cached.lang].map(String).sort() : [String(cached.lang)])
+    const cachedLang = cached?.lang as unknown;
+    const current: string[] = cachedLang
+      ? (Array.isArray(cachedLang) ? (cachedLang as unknown[]).map(String).sort() : [String(cachedLang)])
       : [];
 
     if (JSON.stringify(codes) === JSON.stringify(current)) return;
 
     await this.app.fileManager.processFrontMatter(file, (fm) => {
+      const fmRecord = fm as Record<string, unknown>;
       if (codes.length === 0) {
-        delete fm['lang'];
+        delete fmRecord['lang'];
       } else {
-        fm['lang'] = codes;
+        fmRecord['lang'] = codes;
       }
     });
   }
@@ -888,7 +900,7 @@ export default class MultilingualNotesPlugin extends Plugin {
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
-    a.style.display = "none";
+    a.classList.add("ml-hidden");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -969,7 +981,7 @@ export default class MultilingualNotesPlugin extends Plugin {
       leaf,
       (view) => {
         const fm = this.app.metadataCache.getFileCache(view.file!)?.frontmatter;
-        return fm?.lang_view;
+        return fm?.lang_view as string | undefined;
       },
       this.settings.languages.map((l) => l.code)
     );
@@ -982,7 +994,8 @@ export default class MultilingualNotesPlugin extends Plugin {
     setTimeout(() => {
       if (resolved.view.getMode() === "preview") {
         clearBlockCache();
-        this.resetPreviewDisplayState(resolved.view);
+        const previewEl = resolved.view.containerEl.querySelector(".markdown-preview-view");
+        if (previewEl) sweepSectionVisibility(previewEl, resolved.lang);
         resolved.view.previewMode.rerender(true);
         return;
       }

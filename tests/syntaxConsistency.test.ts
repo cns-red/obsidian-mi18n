@@ -22,7 +22,7 @@ const cases = [
 ];
 
 for (const syntaxCase of cases) {
-  test(`${syntaxCase.name} syntax has one paired block`, () => {
+  void test(`${syntaxCase.name} syntax has one paired block`, () => {
     const blocks = parseLangBlocks(syntaxCase.input);
     assert.equal(blocks.length, 1);
     assert.equal(blocks[0].langCode, "zh-CN");

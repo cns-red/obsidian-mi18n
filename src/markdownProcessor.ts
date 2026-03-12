@@ -7,6 +7,23 @@ import { isLanguageBlockClose, langCodeIncludes, matchLanguageBlockOpen } from "
 const pendingMountElements = new Set<{ el: HTMLElement, evaluate: () => void }>();
 let isMountPolling = false;
 
+// Handler registry: maps each processed element to its evaluateVisibility closure so we can
+// directly sweep all in-DOM sections when the active language changes, without relying solely
+// on rerender(true) which only re-processes sections currently in the virtual-scroller viewport.
+const elementHandlers = new WeakMap<HTMLElement, (active: string) => void>();
+
+/**
+ * Re-apply visibility to every previously-registered section element inside `containerEl`.
+ * Call this immediately before rerender(true) on language switch so that off-screen DOM
+ * sections (outside the virtual-scroller viewport) get the correct state right away.
+ */
+export function sweepSectionVisibility(containerEl: Element, active: string): void {
+  containerEl.querySelectorAll<HTMLElement>("[data-mi18n]").forEach((el) => {
+    const handler = elementHandlers.get(el);
+    if (handler) handler(active);
+  });
+}
+
 function pollPendingMounts() {
   if (pendingMountElements.size === 0) {
     isMountPolling = false;
@@ -213,7 +230,11 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
         }
       }
 
-      const initialDefinitive = el.isConnected;
+      // Register handler so sweepSectionVisibility can directly update this element
+      // when the active language changes (handles off-screen virtual-scroller sections).
+      el.dataset.mi18n = "1";
+      elementHandlers.set(el, evaluateVisibility);
+
       evaluateVisibility(initialActive);
       if (blocks.length > 0 && showLangHeader) {
         ensureLangHeader(el, blocks, plugin, initialActive);
@@ -227,9 +248,7 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
         el,
         evaluate: () => {
           const mountedActive = plugin.getLanguageForElement(el, ctx.sourcePath);
-          if (!initialDefinitive || mountedActive !== initialActive) {
-            evaluateVisibility(mountedActive);
-          }
+          evaluateVisibility(mountedActive);
           if (blocks.length > 0 && showLangHeader) {
             ensureLangHeader(el, blocks, plugin, mountedActive);
           } else {
@@ -253,6 +272,7 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
 
       child.onunload = () => {
         pendingMountElements.delete(queueItem);
+        elementHandlers.delete(el);
       };
 
       ctx.addChild(child);

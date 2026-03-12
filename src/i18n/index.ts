@@ -96,11 +96,13 @@ export function detectObsidianLocale(app?: unknown): string | undefined {
   const fromStorage = typeof window !== "undefined" ? window.localStorage?.getItem("language") : null;
   if (fromStorage && typeof fromStorage === "string" && fromStorage.trim()) return fromStorage;
 
-  const appAny = app as Record<string, any> | undefined;
-  const fromApp = appAny?.locale ?? appAny?.i18n?.locale;
+  const appObj = app as Record<string, unknown> | undefined;
+  const appI18n = appObj?.i18n as Record<string, unknown> | undefined;
+  const fromApp = (appObj?.locale ?? appI18n?.locale) as string | undefined;
   if (typeof fromApp === "string" && fromApp.trim()) return fromApp;
 
-  const fromConfig = appAny?.vault?.getConfig?.("locale");
+  const appVault = appObj?.vault as { getConfig?: (key: string) => unknown } | undefined;
+  const fromConfig = appVault?.getConfig?.("locale");
   if (typeof fromConfig === "string" && fromConfig.trim()) return fromConfig;
 
   const fromDocument = document?.documentElement?.lang;

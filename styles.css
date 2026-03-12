@@ -9,6 +9,7 @@
 
 /* ── Status bar widget ────────────────────────────────────────────────── */
 .ml-status-bar {
+  order: 999;
   cursor: pointer;
   user-select: none;
 }
@@ -215,7 +216,7 @@
   flex-shrink: 0;
 }
 
-.ml-settings-masthead-text h2 {
+.ml-settings-masthead-text .ml-settings-masthead-heading {
   margin: 0 0 3px;
   font-size: 1.25em;
   font-weight: 700;

@@ -1,7 +1,6 @@
 // eslint.config.mjs
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
-import tseslint from "typescript-eslint";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import globals from "globals";
@@ -33,16 +32,35 @@ export default defineConfig([
         },
     },
 
-    // JS 文件不需要类型信息
+    // 测试文件运行于 Node.js，允许使用 Node.js 内置模块
     {
-        files: ["**/*.js"],
+        files: ["tests/**/*.ts"],
+        rules: {
+            "import/no-nodejs-modules": "off",
+        },
+    },
+
+    // Obsidian 插件 TS 源文件运行于 Electron（同时有 browser + Node 上下文）
+    {
+        files: ["src/**/*.ts", "main.ts"],
+        languageOptions: {
+            globals: {
+                ...globals.browser,
+                ...globals.node,
+            },
+        },
+    },
+
+    // JS / MJS 脚本文件运行于 Node.js
+    {
+        files: ["**/*.js", "**/*.mjs"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
-        },
-        globals: {
-            ...globals.browser,
-            ...globals.node,
+            globals: {
+                ...globals.browser,
+                ...globals.node,
+            },
         },
     },
 ]);

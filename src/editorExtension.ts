@@ -69,9 +69,9 @@ function langDecorationsField(config: LangExtensionConfig): StateField<Decoratio
 }
 
 function computeDecorations(state: EditorState, config: LangExtensionConfig): DecorationSet {
-  if (!config.isInScope()) return RangeSet.empty;
+  if (!config.isInScope()) return Decoration.none;
   const active = config.getActiveLanguage();
-  if (!config.getHideMode()) return RangeSet.empty;
+  if (!config.getHideMode()) return Decoration.none;
 
   const decorations: Range<Decoration>[] = [];
   const doc = state.doc;
@@ -97,6 +97,11 @@ function computeDecorations(state: EditorState, config: LangExtensionConfig): De
       blockLang = "";
       blockStartLine = 0;
     }
+  }
+
+  // Handle unclosed block at EOF.
+  if (insideBlock && active !== "ALL" && !langCodeIncludes(blockLang, active)) {
+    applyHideDecorations(decorations, state, blockStartLine, doc.lines, blockLang, doc.lines - blockStartLine + 1);
   }
 
   // Decorations are pushed in line order, no sort needed.
