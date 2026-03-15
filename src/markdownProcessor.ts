@@ -236,6 +236,10 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
       elementHandlers.set(el, evaluateVisibility);
 
       evaluateVisibility(initialActive);
+      {
+        const sizer = el.closest(".markdown-preview-sizer");
+        if (sizer) applyInlineTitleOverride(sizer, ctx.sourcePath, initialActive, plugin);
+      }
       if (blocks.length > 0 && showLangHeader) {
         ensureLangHeader(el, blocks, plugin, initialActive);
       } else {
@@ -249,6 +253,10 @@ export function registerReadingModeProcessor(plugin: MultilingualNotesPlugin): v
         evaluate: () => {
           const mountedActive = plugin.getLanguageForElement(el, ctx.sourcePath);
           evaluateVisibility(mountedActive);
+          {
+            const sizer = el.closest(".markdown-preview-sizer");
+            if (sizer) applyInlineTitleOverride(sizer, ctx.sourcePath, mountedActive, plugin);
+          }
           if (blocks.length > 0 && showLangHeader) {
             ensureLangHeader(el, blocks, plugin, mountedActive);
           } else {
@@ -310,6 +318,48 @@ function removeCloseMarkerFromElement(el: HTMLElement): void {
 
   if (el.textContent?.trim() === "") {
     el.classList.add("ml-language-hidden");
+  }
+}
+
+/**
+ * Update the `.inline-title` element to reflect the active language.
+ *
+ * Reads `title` (default language) and `title_<lang>` (other languages) from
+ * the note's frontmatter. Only acts when:
+ *  - The note has a `lang` field (i.e. it's a multilingual note), AND
+ *  - The note has a `title` frontmatter field.
+ *
+ * The "default language" is the plugin-level `settings.defaultLanguage`,
+ * NOT the per-file `lang_view`.  When active is "ALL" the base `title` is used.
+ */
+export function applyInlineTitleOverride(
+  ownerEl: Element,
+  sourcePath: string,
+  activeLanguage: string,
+  plugin: import("../main").default,
+): void {
+  const titleEl = ownerEl.querySelector<HTMLElement>(".inline-title");
+  if (!titleEl) return;
+
+  const file = plugin.app.vault.getFileByPath(sourcePath);
+  if (!file) return;
+
+  const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+  if (!fm?.lang) return; // Not a multilingual note
+
+  const baseTitle = fm.title as string | undefined;
+  if (!baseTitle) return; // No `title` frontmatter → leave the filename as-is
+
+  const isDefault =
+    activeLanguage === "ALL" ||
+    activeLanguage.toLowerCase() === plugin.settings.defaultLanguage.toLowerCase();
+
+  const newTitle = isDefault
+    ? baseTitle
+    : ((fm[`title_${activeLanguage}`] as string | undefined) ?? baseTitle);
+
+  if (titleEl.textContent !== newTitle) {
+    titleEl.textContent = newTitle;
   }
 }
 

@@ -26,6 +26,7 @@ import {
   extractAvailableLanguagesFromBlocks,
   langMatch,
   sweepSectionVisibility,
+  applyInlineTitleOverride,
 } from "./src/markdownProcessor";
 import { buildEditorExtension, setActiveLangEffect } from "./src/editorExtension";
 import { matchLanguageBlockOpen, isLanguageBlockClose } from "./src/syntax";
@@ -375,7 +376,10 @@ export default class MultilingualNotesPlugin extends Plugin {
     if (leaf.view instanceof MarkdownView) {
       if (leaf.view.getMode() === "preview") {
         const previewEl = leaf.view.containerEl.querySelector(".markdown-preview-view");
-        if (previewEl) sweepSectionVisibility(previewEl, resolvedCode);
+        if (previewEl) {
+          sweepSectionVisibility(previewEl, resolvedCode);
+          applyInlineTitleOverride(previewEl, filePath, resolvedCode, this);
+        }
       } else {
         const cm = (leaf.view.editor as unknown as { cm?: { dispatch: (tr: unknown) => void } })?.cm;
         if (cm && typeof cm.dispatch === "function") {
@@ -405,7 +409,12 @@ export default class MultilingualNotesPlugin extends Plugin {
       if (!(view instanceof MarkdownView)) return;
       if (view.getMode() === "preview") {
         const previewEl = view.containerEl.querySelector(".markdown-preview-view");
-        if (previewEl) sweepSectionVisibility(previewEl, this.getEffectiveLanguageForLeaf(leaf));
+        const effectiveLang = this.getEffectiveLanguageForLeaf(leaf);
+        if (previewEl) {
+          sweepSectionVisibility(previewEl, effectiveLang);
+          const fp = view.file?.path ?? "";
+          if (fp) applyInlineTitleOverride(previewEl, fp, effectiveLang, this);
+        }
         return;
       }
       const cm = (view.editor as unknown as { cm?: { dispatch: (tr: unknown) => void } })?.cm;
