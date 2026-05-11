@@ -162,6 +162,8 @@ Closing the modal or clicking **Cancel** immediately aborts the API request — 
 
 Supports any OpenAI-compatible API: OpenAI, Ollama, OpenRouter, SiliconFlow, and others. Configure under **Settings → AI translation**.
 
+Long notes are automatically sliced at sentence boundaries into chunks that fit the model context window. Before sending, fenced code blocks, Markdown tables, LaTeX equations, and URLs are extracted and replaced with placeholders so the model never corrupts structured content; everything is restored exactly after translation.
+
 ![AI](/examples/images/9d59f904-5c0e-4965-9e71-93f07731cfd4.png)
 
 ---
@@ -183,7 +185,12 @@ Open **Settings → mi18n**:
 - **Show status bar indicator** — toggle the status bar badge
 
 ### AI translation
-API Base URL · API Key · Model (e.g. `gpt-4o-mini`) · System prompt
+- **API Provider** — OpenAI or Anthropic
+- **API Base URL** · **API Key** · **Model** (e.g. `gpt-4o-mini`) · **System prompt**
+- **Max context** — context-window size used to calculate chunk limits
+- **Max tokens** — per-request output cap
+- **Timeout** — seconds to wait for a single chunk response
+- **Concurrency** — max parallel chunk requests
 
 ### Scope
 Restrict mi18n to specific vault folders:

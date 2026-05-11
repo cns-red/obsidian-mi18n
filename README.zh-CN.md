@@ -167,6 +167,8 @@ title_en: "My Article"  # 各语言独立标题（格式：title_<语言代码>�
 
 支持任意兼容 OpenAI 的 API：OpenAI、Ollama、OpenRouter、SiliconFlow 等。在 **设置 → AI 翻译** 中配置。
 
+长笔记会自动按句子边界切片为适合模型上下文窗口的块。发送前，代码块、Markdown 表格、LaTeX 公式和 URL 会被提取并替换为占位符，避免模型破坏结构化内容；翻译完成后原样恢复。
+
 ![AI](/examples/images/9d59f904-5c0e-4965-9e71-93f07731cfd4.png)
 
 ---
@@ -188,7 +190,12 @@ title_en: "My Article"  # 各语言独立标题（格式：title_<语言代码>�
 - **显示状态栏指示器** —— 控制右下角状态栏徽标
 
 ### AI 翻译
-API Base URL · API Key · 模型（如 `gpt-4o-mini`）· 系统提示词
+- **API 供应商** — OpenAI 或 Anthropic
+- **API Base URL** · **API Key** · **模型**（如 `gpt-4o-mini`）· **系统提示词**
+- **最大上下文** — 用于计算切片上限的上下文窗口大小
+- **最大 Token** — 单次请求输出上限
+- **超时** — 单块请求等待秒数
+- **并发数** — 并行切片请求上限
 
 ### 作用范围
 限制 mi18n 在特定 vault 文件夹内生效：
