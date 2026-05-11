@@ -68,6 +68,8 @@ const ko = {
         language_row: "언어 #{index}",
         remove_language_tooltip: "이 언어 제거",
         ai_translation_title: "AI 스마트 번역",
+        ai_api_company_name: "API Provider",
+        ai_api_company_desc: "Choose the AI service provider. OpenAI uses the standard /chat/completions endpoint. Anthropic uses the /messages endpoint.",
         ai_api_base_name: "API Base URL",
         ai_api_base_desc: "OpenAI 호환 API 기본 URL입니다.",
         ai_api_key_name: "API Key",

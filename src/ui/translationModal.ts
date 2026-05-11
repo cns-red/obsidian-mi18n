@@ -1,7 +1,7 @@
 import { App, Component, Modal, Notice, ButtonComponent, MarkdownRenderer, setIcon } from "obsidian";
 import type { MultilingualNotesSettings, LanguageEntry } from "../settings";
 import { t } from "../i18n";
-import { streamTranslation } from "../api/ai";
+import { streamTranslation, splitIntoChunks, extractCodeBlocks, restoreCodeBlocks, extractUrls, restoreUrls, type ChunkInfo } from "../api/ai";
 
 interface TranslationPlugin {
     settings: MultilingualNotesSettings;
@@ -26,6 +26,9 @@ export class TranslationModal extends Modal {
     private isStreaming: boolean = false;
     private isEditMode: boolean = false;
     private abortController: AbortController | null = null;
+    private currentChunk = 0;
+    private totalChunks = 0;
+    private renderComponent: Component | null = null;
 
     public onInsertCallback: ((text: string, targetLangCode: string) => void) | null = null;
 
@@ -61,6 +64,7 @@ export class TranslationModal extends Modal {
     onOpen(): void {
         const { contentEl } = this;
         contentEl.empty();
+        this.renderComponent = new Component();
 
         this.modalEl.addClass("ml-tr-modal");
 
@@ -234,20 +238,22 @@ export class TranslationModal extends Modal {
         this.extractedSourceContent = this.stripFrontmatter(
             this.plugin.extractLanguageContent(this.sourceContent, this.sourceLanguage)
         );
-        void MarkdownRenderer.render(
-            this.app,
-            this.extractedSourceContent || "_No source text found for this language._",
-            this.sourceRenderEl, "", this as unknown as Component
-        );
+        if (this.renderComponent) {
+            void MarkdownRenderer.render(
+                this.app,
+                this.extractedSourceContent || "_No source text found for this language._",
+                this.sourceRenderEl, "", this.renderComponent
+            );
+        }
     }
 
     private renderTranslation(): void {
-        if (!this.previewRenderEl) return;
+        if (!this.previewRenderEl || !this.renderComponent) return;
         this.previewRenderEl.empty();
         void MarkdownRenderer.render(
             this.app,
             this.translatedContent || "_Translation will appear here…_",
-            this.previewRenderEl, "", this as unknown as Component
+            this.previewRenderEl, "", this.renderComponent
         );
     }
 
@@ -260,13 +266,12 @@ export class TranslationModal extends Modal {
     }
 
     private async runStreamTranslation(): Promise<void> {
-        if (!this.generateBtn || !this.previewTextArea) return;
+        if (!this.generateBtn || !this.previewTextArea || !this.previewRenderEl) return;
 
         this.abortController = new AbortController();
         this.isStreaming = true;
         this.translatedContent = "";
         this.previewTextArea.value = "";
-        this.renderTranslation();
 
         this.generateBtn.setButtonText(t("button.translating"));
         this.generateBtn.buttonEl.addClass("ml-tr-spinning");
@@ -279,47 +284,322 @@ export class TranslationModal extends Modal {
             this.syncViewMode();
         }
 
-        // Add streaming cursor
-        this.previewRenderEl?.addClass("ml-tr-streaming");
+        const srcName = this.plugin.settings.languages.find(
+            (l: LanguageEntry) => l.code.toLowerCase() === this.sourceLanguage
+        )?.label || this.sourceLanguage;
+        const tgtName = this.plugin.settings.languages.find(
+            (l: LanguageEntry) => l.code === this.targetLanguage
+        )?.label || this.targetLanguage;
+
+        // ── Extract code blocks (they don't need translation) ───────────────
+        const { text: textWithoutCode, blocks: codeBlocks } = extractCodeBlocks(
+            this.extractedSourceContent
+        );
+
+        // ── Extract URLs (prevent model from hallucinating/modifying them) ──
+        const { text: textWithPlaceholders, urls } = extractUrls(textWithoutCode);
+
+        // ── Chunking ────────────────────────────────────────────────────────
+        const { aiMaxContext, aiMaxTokens } = this.plugin.settings;
+        if (aiMaxContext - aiMaxTokens < 4000) {
+            new Notice(t("notice.context_too_small"));
+            this.isStreaming = false;
+            this.generateBtn.setButtonText(t("button.regenerate"));
+            this.generateBtn.buttonEl.removeClass("ml-tr-spinning");
+            this.updateGenerateBtnState();
+            return;
+        }
+        const chunks = splitIntoChunks(
+            textWithPlaceholders,
+            aiMaxContext,
+            aiMaxTokens,
+            this.plugin.settings.aiSystemPrompt,
+            this.sourceLanguage,
+        );
+        this.totalChunks = chunks.length;
+        this.currentChunk = 0;
+
+        // ── Choose mode: single-chunk streaming vs multi-chunk batch ─────────
+        if (chunks.length <= 1) {
+            await this.runSingleChunkTranslation(chunks, srcName, tgtName, codeBlocks, urls);
+        } else {
+            await this.runBatchTranslation(chunks, srcName, tgtName, codeBlocks, urls);
+        }
+    }
+
+    /**
+     * Single-chunk mode: stream translation text directly into a plain-text
+     * container so the user can watch the output arrive in real time.
+     */
+    private async runSingleChunkTranslation(
+        chunks: string[],
+        srcName: string,
+        tgtName: string,
+        codeBlocks: string[],
+        urls: string[],
+    ): Promise<void> {
+        if (!this.previewRenderEl || !this.generateBtn) return;
+
+        this.previewRenderEl.addClass("ml-tr-hidden");
+        const streamingEl = this.previewRenderEl.parentElement!.createDiv("ml-tr-streaming-text");
+        const textNode = document.createTextNode("");
+        streamingEl.appendChild(textNode);
+
+        let allTranslated = "";
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 1500;
+        let textBuffer = "";
+        let flushTimer: number | null = null;
+        let scrollTimer: number | null = null;
+
+        const flushBuffer = (): void => {
+            if (textBuffer) {
+                textNode.data += textBuffer;
+                textBuffer = "";
+            }
+            flushTimer = null;
+        };
+        const throttledScroll = (): void => {
+            if (scrollTimer !== null) return;
+            scrollTimer = window.setTimeout(() => {
+                streamingEl.scrollTop = streamingEl.scrollHeight;
+                scrollTimer = null;
+            }, 100);
+        };
 
         try {
-            const srcName = this.plugin.settings.languages.find(
-                (l: LanguageEntry) => l.code.toLowerCase() === this.sourceLanguage
-            )?.label || this.sourceLanguage;
-            const tgtName = this.plugin.settings.languages.find(
-                (l: LanguageEntry) => l.code === this.targetLanguage
-            )?.label || this.targetLanguage;
+            const chunkParts: string[] = [];
+            let retries = 0;
+            let succeeded = false;
+            const baseLength = textNode.data.length;
 
-            await streamTranslation(
-                this.extractedSourceContent, tgtName, srcName, this.plugin.settings,
-                (chunk: string) => {
-                    if (!this.isStreaming) return;
-                    this.translatedContent += chunk;
-                    window.requestAnimationFrame(() => {
-                        this.renderTranslation();
-                        if (this.previewRenderEl) {
-                            this.previewRenderEl.scrollTop = this.previewRenderEl.scrollHeight;
+            while (retries < MAX_RETRIES && !succeeded) {
+                try {
+                    if (textNode.data.length > baseLength) {
+                        textNode.data = textNode.data.slice(0, baseLength);
+                    }
+                    chunkParts.length = 0;
+                    if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
+                    textBuffer = "";
+
+                    await streamTranslation(
+                        chunks[0],
+                        tgtName,
+                        srcName,
+                        this.plugin.settings,
+                        (chunk: string) => {
+                            if (!this.isStreaming) return;
+                            chunkParts.push(chunk);
+                            textBuffer += chunk;
+                            if (flushTimer === null) {
+                                flushTimer = window.setTimeout(flushBuffer, 50);
+                            }
+                            throttledScroll();
+                        },
+                        this.abortController!.signal,
+                    );
+                    succeeded = true;
+                } catch (err) {
+                    retries++;
+                    if (err instanceof Error && err.name === "AbortError") { throw err; }
+                    if (retries >= MAX_RETRIES) {
+                        if (textNode.data.length > baseLength) {
+                            textNode.data = textNode.data.slice(0, baseLength);
                         }
-                    });
-                },
-                this.abortController.signal,
-            );
+                        const failedMarker = `\n\n[${t("notice.translate_chunk_failed", { current: 1, total: 1 })}]\n\n`;
+                        chunkParts.length = 0;
+                        chunkParts.push(failedMarker);
+                        textNode.data += failedMarker;
+                        new Notice(t("notice.translate_chunk_failed_notice", { current: 1 }));
+                        break;
+                    }
+                    await this.sleep(RETRY_DELAY_MS);
+                }
+            }
+
+            if (flushTimer !== null) { clearTimeout(flushTimer); flushBuffer(); }
+            allTranslated += chunkParts.join("");
         } catch (err) {
-            // AbortError is expected when the user cancels — don't show a notice
-            if (err instanceof Error && err.name === "AbortError") return;
-            const msg = err instanceof Error ? err.message : String(err);
-            new Notice(`Error: ${msg}`);
+            if (err instanceof Error && err.name === "AbortError") {
+                /* fall through to finally */
+            } else {
+                const msg = err instanceof Error ? err.message : String(err);
+                new Notice(`Error: ${msg}`);
+            }
         } finally {
             this.isStreaming = false;
             this.abortController = null;
-            this.previewRenderEl?.removeClass("ml-tr-streaming");
-            this.generateBtn.setButtonText(t("button.regenerate"));
-            this.generateBtn.buttonEl.removeClass("ml-tr-spinning");
+            if (flushTimer !== null) { clearTimeout(flushTimer); flushBuffer(); }
+            if (scrollTimer !== null) { clearTimeout(scrollTimer); }
+
+            const rawOutput = textNode.data;
+            if (rawOutput) {
+                let result = restoreUrls(rawOutput, urls);
+                result = restoreCodeBlocks(result, codeBlocks);
+                this.translatedContent = result;
+            }
+            streamingEl.remove();
+            this.previewRenderEl!.removeClass("ml-tr-hidden");
+            this.generateBtn!.setButtonText(t("button.regenerate"));
+            this.generateBtn!.buttonEl.removeClass("ml-tr-spinning");
             this.updateGenerateBtnState();
             if (this.previewTextArea) this.previewTextArea.value = this.translatedContent;
             this.renderTranslation();
             this.updateInsertBtnState();
         }
+    }
+
+    /**
+     * Batch mode: translate multiple chunks concurrently in the background.
+     * No Markdown is rendered during streaming — only per-chunk character counts
+     * are shown so the user knows the model is still alive.
+     */
+    private async runBatchTranslation(
+        chunks: string[],
+        srcName: string,
+        tgtName: string,
+        codeBlocks: string[],
+        urls: string[],
+    ): Promise<void> {
+        if (!this.previewRenderEl || !this.generateBtn) return;
+
+        // Hide the split panel, show the batch status panel
+        const splitEl = this.previewRenderEl.closest(".ml-tr-split") as HTMLElement | null;
+        splitEl?.addClass("ml-tr-hidden");
+
+        const batchPanel = this.contentEl.createDiv("ml-tr-batch-panel");
+        batchPanel.createEl("h3", { text: t("label.batch_translation"), cls: "ml-tr-batch-title" });
+        const batchList = batchPanel.createDiv("ml-tr-batch-list");
+        const summaryEl = batchPanel.createDiv("ml-tr-batch-summary");
+
+        interface ChunkStatus { chars: number; status: "pending" | "translating" | "done" | "failed"; }
+        const statuses: ChunkStatus[] = chunks.map(() => ({ chars: 0, status: "pending" }));
+        const statusEls: HTMLElement[] = [];
+
+        for (let i = 0; i < chunks.length; i++) {
+            const row = batchList.createDiv("ml-tr-batch-row");
+            row.createEl("span", { text: t("label.chunk_n_of_total", { current: i + 1, total: chunks.length }), cls: "ml-tr-batch-label" });
+            const statusEl = row.createEl("span", { cls: "ml-tr-batch-status" });
+            statusEls.push(statusEl);
+        }
+
+        const updateUI = (): void => {
+            const doneCount = statuses.filter(s => s.status === "done").length;
+            const totalChars = statuses.reduce((sum, s) => sum + s.chars, 0);
+            for (let i = 0; i < chunks.length; i++) {
+                const s = statuses[i];
+                const statusText = s.status === "pending" ? t("label.chunk_status_pending")
+                    : s.status === "translating" ? `${t("label.chunk_status_translating")} ${s.chars.toLocaleString()}`
+                    : s.status === "done" ? `${t("label.chunk_status_done")} ${s.chars.toLocaleString()}`
+                    : `${t("label.chunk_status_failed")} ${s.chars.toLocaleString()}`;
+                statusEls[i].setText(statusText);
+                statusEls[i].setAttribute("data-status", s.status);
+            }
+            summaryEl.setText(t("notice.translate_progress", { done: doneCount, total: chunks.length, chars: totalChars.toLocaleString() }));
+        };
+        updateUI();
+
+        const results: (string | null)[] = new Array(chunks.length).fill(null);
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 1500;
+        const concurrency = Math.max(1, Math.min(10, this.plugin.settings.aiConcurrency || 2));
+        let nextIndex = 0;
+        let abortError: Error | null = null;
+
+        const worker = async (): Promise<void> => {
+            while (nextIndex < chunks.length) {
+                const i = nextIndex++;
+                if (this.abortController?.signal.aborted) return;
+
+                statuses[i] = { chars: 0, status: "translating" };
+                updateUI();
+
+                const chunkParts: string[] = [];
+                let retries = 0;
+                let succeeded = false;
+
+                while (retries < MAX_RETRIES && !succeeded) {
+                    try {
+                        chunkParts.length = 0;
+                        await streamTranslation(
+                            chunks[i],
+                            tgtName,
+                            srcName,
+                            this.plugin.settings,
+                            (chunk: string) => {
+                                if (!this.isStreaming) return;
+                                chunkParts.push(chunk);
+                                statuses[i].chars = chunkParts.join("").length;
+                                updateUI();
+                            },
+                            this.abortController!.signal,
+                            { current: i + 1, total: chunks.length },
+                        );
+                        succeeded = true;
+                    } catch (err) {
+                        retries++;
+                        if (err instanceof Error && err.name === "AbortError") {
+                            abortError = err;
+                            return;
+                        }
+                        if (retries >= MAX_RETRIES) {
+                            const failedMarker = `\n\n[${t("notice.translate_chunk_failed", { current: i + 1, total: chunks.length })}]\n\n`;
+                            chunkParts.length = 0;
+                            chunkParts.push(failedMarker);
+                            break;
+                        }
+                        await this.sleep(RETRY_DELAY_MS);
+                    }
+                }
+
+                results[i] = chunkParts.join("");
+                statuses[i].chars = results[i]!.length;
+                statuses[i].status = succeeded ? "done" : "failed";
+                updateUI();
+            }
+        };
+
+        try {
+            const workers = Array.from({ length: concurrency }, () => worker());
+            await Promise.all(workers);
+
+            if (abortError) return; // user cancelled — partial output handled in finally
+
+            // Join results with double-newlines between successful chunks
+            const parts: string[] = [];
+            for (let i = 0; i < results.length; i++) {
+                if (results[i] !== null) parts.push(results[i]!);
+            }
+            let raw = parts.join("\n\n");
+            raw = restoreUrls(raw, urls);
+            raw = restoreCodeBlocks(raw, codeBlocks);
+            this.translatedContent = raw;
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            new Notice(`Error: ${msg}`);
+        } finally {
+            this.isStreaming = false;
+            this.abortController = null;
+            batchPanel.remove();
+            splitEl?.removeClass("ml-tr-hidden");
+            this.generateBtn!.setButtonText(t("button.regenerate"));
+            this.generateBtn!.buttonEl.removeClass("ml-tr-spinning");
+            this.updateGenerateBtnState();
+            if (this.previewTextArea) this.previewTextArea.value = this.translatedContent;
+            this.renderTranslation();
+            this.updateInsertBtnState();
+        }
+    }
+
+    private updateChunkButtonText(): void {
+        if (!this.generateBtn || this.totalChunks <= 1) return;
+        this.generateBtn.setButtonText(
+            t("button.translating_chunk", { current: this.currentChunk, total: this.totalChunks })
+        );
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     private doInsert(): void {
@@ -329,6 +609,8 @@ export class TranslationModal extends Modal {
 
     onClose(): void {
         this.cancelStream();
+        this.renderComponent?.unload();
+        this.renderComponent = null;
         this.contentEl.empty();
     }
 }

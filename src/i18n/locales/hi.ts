@@ -71,6 +71,8 @@ const hi = {
         label_placeholder: "लेबल (जैसे हिन्दी)",
         syntax_sample_content: "सामग्री / Content",
         ai_translation_title: "AI अनुवाद",
+        ai_api_company_name: "API Provider",
+        ai_api_company_desc: "Choose the AI service provider. OpenAI uses the standard /chat/completions endpoint. Anthropic uses the /messages endpoint.",
         ai_api_base_name: "API Base URL",
         ai_api_base_desc: "OpenAI-संगत API के लिए बेस URL।",
         ai_api_key_name: "API Key",

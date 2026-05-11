@@ -36,6 +36,8 @@ export interface LanguageEntry {
   label: string;
 }
 
+export type AiApiCompany = "openai" | "anthropic";
+
 export interface MultilingualNotesSettings {
   activeLanguage: string;
   languages: LanguageEntry[];
@@ -44,10 +46,15 @@ export interface MultilingualNotesSettings {
   showLangHeader: boolean;
   showRibbon: boolean;
   showStatusBar: boolean;
+  aiApiCompany: AiApiCompany;
   aiApiBase: string;
   aiApiKey: string;
   aiModel: string;
+  aiMaxContext: number;
+  aiMaxTokens: number;
+  aiTimeout: number;
   aiSystemPrompt: string;
+  aiConcurrency: number;
   /** Override the inline title from frontmatter `title` / `title_<lang>`. */
   overrideInlineTitle: boolean;
   /** Vault-relative folder paths. Empty = plugin works everywhere. */
@@ -71,10 +78,15 @@ export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
   showRibbon: true,
   showStatusBar: true,
 
+  aiApiCompany: "openai",
   aiApiBase: "https://api.openai.com/v1",
   aiApiKey: "",
   aiModel: "gpt-4o-mini",
+  aiMaxContext: 128000,
+  aiMaxTokens: 4096,
+  aiTimeout: 120,
   aiSystemPrompt: "You are an expert translator. Translate the provided Markdown text into the target language. Output ONLY the translated text, block for block, preserving all Markdown formatting, frontmatter, and code blocks exactly. Do not add any conversational filler or explain your translation.",
+  aiConcurrency: 2,
   workDirs: [],
   excludeDirs: [],
 };
@@ -246,6 +258,19 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
     this.section(containerEl, "bot-message-square", t("settings.ai_translation_title"), t("settings.section_ai_desc"), (body) => {
 
       new Setting(body)
+        .setName(t("settings.ai_api_company_name"))
+        .setDesc(t("settings.ai_api_company_desc"))
+        .addDropdown((drop) => {
+          drop.addOption("openai", "OpenAI");
+          drop.addOption("anthropic", "Anthropic");
+          drop.setValue(this.plugin.settings.aiApiCompany);
+          drop.onChange(async (value) => {
+            this.plugin.settings.aiApiCompany = value as AiApiCompany;
+            await this.plugin.saveSettings();
+          });
+        });
+
+      new Setting(body)
         .setName(t("settings.ai_api_base_name"))
         .setDesc(t("settings.ai_api_base_desc"))
         .addText((text) => {
@@ -253,7 +278,9 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
             .setPlaceholder("https://api.openai.com/v1")
             .setValue(this.plugin.settings.aiApiBase)
             .onChange(async (value) => {
-              this.plugin.settings.aiApiBase = value.trim() || "https://api.openai.com/v1";
+              let v = value.trim() || "https://api.openai.com/v1";
+              v = v.replace(/\/+$/, "");
+              this.plugin.settings.aiApiBase = v;
               await this.plugin.saveSettings();
             });
           text.inputEl.addClass("ml-settings-input-wide");
@@ -287,6 +314,70 @@ export class MultilingualNotesSettingTab extends PluginSettingTab {
               this.plugin.settings.aiModel = value.trim() || "gpt-4o-mini";
               await this.plugin.saveSettings();
             });
+          text.inputEl.addClass("ml-settings-input-medium");
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_max_context_name"))
+        .setDesc(t("settings.ai_max_context_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("128000")
+            .setValue(String(this.plugin.settings.aiMaxContext))
+            .onChange(async (value) => {
+              const n = parseInt(value.trim(), 10);
+              this.plugin.settings.aiMaxContext = Number.isFinite(n) && n > 0 ? n : 128000;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.type = "number";
+          text.inputEl.addClass("ml-settings-input-medium");
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_max_tokens_name"))
+        .setDesc(t("settings.ai_max_tokens_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("4096")
+            .setValue(String(this.plugin.settings.aiMaxTokens))
+            .onChange(async (value) => {
+              const n = parseInt(value.trim(), 10);
+              this.plugin.settings.aiMaxTokens = Number.isFinite(n) && n > 0 ? n : 4096;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.type = "number";
+          text.inputEl.addClass("ml-settings-input-medium");
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_timeout_name"))
+        .setDesc(t("settings.ai_timeout_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("120")
+            .setValue(String(this.plugin.settings.aiTimeout))
+            .onChange(async (value) => {
+              const n = parseInt(value.trim(), 10);
+              this.plugin.settings.aiTimeout = Number.isFinite(n) && n > 0 ? n : 120;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.type = "number";
+          text.inputEl.addClass("ml-settings-input-medium");
+        });
+
+      new Setting(body)
+        .setName(t("settings.ai_concurrency_name"))
+        .setDesc(t("settings.ai_concurrency_desc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("2")
+            .setValue(String(this.plugin.settings.aiConcurrency))
+            .onChange(async (value) => {
+              const n = parseInt(value.trim(), 10);
+              this.plugin.settings.aiConcurrency = Number.isFinite(n) && n >= 1 && n <= 10 ? n : 2;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.type = "number";
           text.inputEl.addClass("ml-settings-input-medium");
         });
 

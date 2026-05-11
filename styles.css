@@ -779,6 +779,70 @@
   display: none !important;
 }
 
+/* ── Batch translation panel (multi-chunk background mode) ───────────── */
+.ml-tr-batch-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+.ml-tr-batch-title {
+  margin: 0 0 16px;
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ml-tr-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ml-tr-batch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-size: 0.9em;
+}
+
+.ml-tr-batch-label {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.ml-tr-batch-status {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.ml-tr-batch-status[data-status="translating"] {
+  color: var(--text-accent);
+}
+
+.ml-tr-batch-status[data-status="done"] {
+  color: var(--text-success);
+}
+
+.ml-tr-batch-status[data-status="failed"] {
+  color: var(--text-error);
+}
+
+.ml-tr-batch-summary {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--background-modifier-form-field);
+  font-size: 0.9em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 /* ── Error state ─────────────────────────────────────────────────────── */
 .ml-tr-error {
   padding: 40px 32px;

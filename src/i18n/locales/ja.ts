@@ -75,6 +75,8 @@ const ja = {
         label_placeholder: "ラベル、例：日本語",
         syntax_sample_content: "内容 / Content",
         ai_translation_title: "AI スマート翻訳",
+        ai_api_company_name: "API Provider",
+        ai_api_company_desc: "Choose the AI service provider. OpenAI uses the standard /chat/completions endpoint. Anthropic uses the /messages endpoint.",
         ai_api_base_name: "API Base URL",
         ai_api_base_desc: "OpenAI 互換の API ベース URL。",
         ai_api_key_name: "API Key",
