@@ -135,6 +135,7 @@ const zhTW = {
         translating: "翻譯中...",
         translating_chunk: "翻譯中... ({current}/{total})",
         regenerate: "重新生成",
+        retry: "重試",
     },
     label: {
         preview_edit: "預覽與編輯",
@@ -144,6 +145,7 @@ const zhTW = {
         chunk_n_of_total: "Section {current}/{total}",
         chunk_status_pending: "Waiting...",
         chunk_status_translating: "Translating...",
+        chunk_status_splitting: "Splitting...",
         chunk_status_done: "Done",
         chunk_status_failed: "Failed",
     },

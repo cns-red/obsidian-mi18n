@@ -38,6 +38,11 @@ export interface LanguageEntry {
 
 export type AiApiCompany = "openai" | "anthropic";
 
+export interface TranslationStats {
+  ratio: number;
+  samples: number;
+}
+
 export interface MultilingualNotesSettings {
   activeLanguage: string;
   languages: LanguageEntry[];
@@ -61,6 +66,8 @@ export interface MultilingualNotesSettings {
   workDirs: string[];
   /** Vault-relative folder paths. Plugin is fully disabled inside these. */
   excludeDirs: string[];
+  /** Historical expansion ratios per language pair, used to adaptively calibrate chunk sizes. */
+  translationStats: Record<string, TranslationStats>;
 }
 
 export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
@@ -89,6 +96,7 @@ export const DEFAULT_SETTINGS: MultilingualNotesSettings = {
   aiConcurrency: 2,
   workDirs: [],
   excludeDirs: [],
+  translationStats: {},
 };
 
 export const SYNTAX_EXAMPLES = [

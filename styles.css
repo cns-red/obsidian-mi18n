@@ -834,6 +834,25 @@
   color: var(--text-error);
 }
 
+.ml-tr-batch-status[data-status="splitting"] {
+  color: var(--text-warning);
+}
+
+.ml-tr-retry-btn {
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.ml-tr-retry-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
 .ml-tr-batch-summary {
   padding: 10px 14px;
   border-radius: 8px;

@@ -154,6 +154,7 @@ const en = {
     translating: "Translating...",
     translating_chunk: "Translating... ({current}/{total})",
     regenerate: "Regenerate",
+    retry: "Retry",
   },
   label: {
     preview_edit: "Preview & edit text",
@@ -163,6 +164,7 @@ const en = {
     chunk_n_of_total: "Section {current}/{total}",
     chunk_status_pending: "Waiting...",
     chunk_status_translating: "Translating...",
+    chunk_status_splitting: "Splitting...",
     chunk_status_done: "Done",
     chunk_status_failed: "Failed",
   },

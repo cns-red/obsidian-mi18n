@@ -1,11 +1,12 @@
 import { App, Component, Modal, Notice, ButtonComponent, MarkdownRenderer, setIcon } from "obsidian";
 import type { MultilingualNotesSettings, LanguageEntry } from "../settings";
 import { t } from "../i18n";
-import { streamTranslation, splitIntoChunks, extractCodeBlocks, restoreCodeBlocks, extractUrls, restoreUrls, type ChunkInfo } from "../api/ai";
+import { streamTranslation, splitIntoChunks, extractCodeBlocks, restoreCodeBlocks, extractUrls, restoreUrls, extractTables, restoreTables, extractLatex, restoreLatex, sliceAtSentenceBoundaries, updateTranslationStats, type ChunkInfo, type TranslationStats } from "../api/ai";
 
 interface TranslationPlugin {
     settings: MultilingualNotesSettings;
     extractLanguageContent(source: string, targetLangCode: string): string;
+    saveSettings(): Promise<void>;
 }
 
 export class TranslationModal extends Modal {
@@ -257,6 +258,16 @@ export class TranslationModal extends Modal {
         );
     }
 
+    private renderTranslationText(text: string): void {
+        if (!this.previewRenderEl || !this.renderComponent) return;
+        this.previewRenderEl.empty();
+        void MarkdownRenderer.render(
+            this.app,
+            text || "_Translation will appear here…_",
+            this.previewRenderEl, "", this.renderComponent
+        );
+    }
+
     private updateGenerateBtnState(): void {
         this.generateBtn?.setDisabled(!this.targetLanguage || !this.sourceLanguage || this.isStreaming);
     }
@@ -296,8 +307,14 @@ export class TranslationModal extends Modal {
             this.extractedSourceContent
         );
 
+        // ── Extract Markdown tables ──────────────────────────────────────────
+        const { text: textWithoutTables, tables } = extractTables(textWithoutCode);
+
+        // ── Extract LaTeX equations ──────────────────────────────────────────
+        const { text: textWithoutLatex, latex } = extractLatex(textWithoutTables);
+
         // ── Extract URLs (prevent model from hallucinating/modifying them) ──
-        const { text: textWithPlaceholders, urls } = extractUrls(textWithoutCode);
+        const { text: textWithPlaceholders, urls } = extractUrls(textWithoutLatex);
 
         // ── Chunking ────────────────────────────────────────────────────────
         const { aiMaxContext, aiMaxTokens } = this.plugin.settings;
@@ -309,21 +326,36 @@ export class TranslationModal extends Modal {
             this.updateGenerateBtnState();
             return;
         }
+        const statsKey = `${this.sourceLanguage}→${this.targetLanguage}`;
+        const stats: TranslationStats | undefined = this.plugin.settings.translationStats[statsKey];
         const chunks = splitIntoChunks(
             textWithPlaceholders,
             aiMaxContext,
             aiMaxTokens,
             this.plugin.settings.aiSystemPrompt,
             this.sourceLanguage,
+            this.targetLanguage,
+            stats,
         );
         this.totalChunks = chunks.length;
         this.currentChunk = 0;
 
         // ── Choose mode: single-chunk streaming vs multi-chunk batch ─────────
         if (chunks.length <= 1) {
-            await this.runSingleChunkTranslation(chunks, srcName, tgtName, codeBlocks, urls);
+            await this.runSingleChunkTranslation(chunks, srcName, tgtName, codeBlocks, urls, tables, latex);
         } else {
-            await this.runBatchTranslation(chunks, srcName, tgtName, codeBlocks, urls);
+            await this.runBatchTranslation(chunks, srcName, tgtName, codeBlocks, urls, tables, latex);
+        }
+
+        // ── Record adaptive stats ────────────────────────────────────────────
+        if (this.translatedContent && textWithPlaceholders) {
+            const currentStats = this.plugin.settings.translationStats[statsKey] ?? { ratio: 0, samples: 0 };
+            this.plugin.settings.translationStats[statsKey] = updateTranslationStats(
+                currentStats,
+                textWithPlaceholders.length,
+                this.translatedContent.length,
+            );
+            await this.plugin.saveSettings();
         }
     }
 
@@ -337,50 +369,62 @@ export class TranslationModal extends Modal {
         tgtName: string,
         codeBlocks: string[],
         urls: string[],
+        tables: string[],
+        latex: string[],
     ): Promise<void> {
         if (!this.previewRenderEl || !this.generateBtn) return;
 
-        this.previewRenderEl.addClass("ml-tr-hidden");
-        const streamingEl = this.previewRenderEl.parentElement!.createDiv("ml-tr-streaming-text");
-        const textNode = document.createTextNode("");
-        streamingEl.appendChild(textNode);
-
-        let allTranslated = "";
         const MAX_RETRIES = 3;
         const RETRY_DELAY_MS = 1500;
-        let textBuffer = "";
-        let flushTimer: number | null = null;
-        let scrollTimer: number | null = null;
 
-        const flushBuffer = (): void => {
-            if (textBuffer) {
-                textNode.data += textBuffer;
-                textBuffer = "";
+        // Throttle Markdown re-renders to avoid jank (150ms feels responsive).
+        let lastRender = 0;
+        const RENDER_INTERVAL = 150;
+        let renderPending = false;
+        let renderTimer: number | null = null;
+
+        const flushRender = (): void => {
+            renderPending = false;
+            renderTimer = null;
+            // 实时还原占位符后再渲染，避免用户在预览中看到 {{CODE_BLOCK_0}} 这类标记
+            let raw = this.translatedContent;
+            raw = restoreUrls(raw, urls);
+            raw = restoreLatex(raw, latex);
+            raw = restoreTables(raw, tables);
+            raw = restoreCodeBlocks(raw, codeBlocks);
+            this.renderTranslationText(raw);
+            // Scroll preview panel to bottom so latest output is visible.
+            const previewBody = this.previewRenderEl!.closest(".ml-tr-panel-body") as HTMLElement | null;
+            if (previewBody) {
+                previewBody.scrollTop = previewBody.scrollHeight;
             }
-            flushTimer = null;
         };
-        const throttledScroll = (): void => {
-            if (scrollTimer !== null) return;
-            scrollTimer = window.setTimeout(() => {
-                streamingEl.scrollTop = streamingEl.scrollHeight;
-                scrollTimer = null;
-            }, 100);
+
+        const throttledRender = (): void => {
+            const now = Date.now();
+            if (now - lastRender < RENDER_INTERVAL) {
+                if (!renderPending) {
+                    renderPending = true;
+                    renderTimer = window.setTimeout(() => {
+                        lastRender = Date.now();
+                        flushRender();
+                    }, RENDER_INTERVAL - (now - lastRender));
+                }
+                return;
+            }
+            lastRender = now;
+            if (renderTimer !== null) { clearTimeout(renderTimer); renderTimer = null; }
+            flushRender();
         };
 
         try {
             const chunkParts: string[] = [];
             let retries = 0;
             let succeeded = false;
-            const baseLength = textNode.data.length;
 
             while (retries < MAX_RETRIES && !succeeded) {
                 try {
-                    if (textNode.data.length > baseLength) {
-                        textNode.data = textNode.data.slice(0, baseLength);
-                    }
                     chunkParts.length = 0;
-                    if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-                    textBuffer = "";
 
                     await streamTranslation(
                         chunks[0],
@@ -390,11 +434,11 @@ export class TranslationModal extends Modal {
                         (chunk: string) => {
                             if (!this.isStreaming) return;
                             chunkParts.push(chunk);
-                            textBuffer += chunk;
-                            if (flushTimer === null) {
-                                flushTimer = window.setTimeout(flushBuffer, 50);
-                            }
-                            throttledScroll();
+                            // 实时保存 + 实时渲染 Markdown
+                            const currentText = chunkParts.join("");
+                            this.translatedContent = currentText;
+                            if (this.previewTextArea) this.previewTextArea.value = currentText;
+                            throttledRender();
                         },
                         this.abortController!.signal,
                     );
@@ -403,22 +447,16 @@ export class TranslationModal extends Modal {
                     retries++;
                     if (err instanceof Error && err.name === "AbortError") { throw err; }
                     if (retries >= MAX_RETRIES) {
-                        if (textNode.data.length > baseLength) {
-                            textNode.data = textNode.data.slice(0, baseLength);
-                        }
                         const failedMarker = `\n\n[${t("notice.translate_chunk_failed", { current: 1, total: 1 })}]\n\n`;
                         chunkParts.length = 0;
                         chunkParts.push(failedMarker);
-                        textNode.data += failedMarker;
+                        this.translatedContent = failedMarker;
                         new Notice(t("notice.translate_chunk_failed_notice", { current: 1 }));
                         break;
                     }
                     await this.sleep(RETRY_DELAY_MS);
                 }
             }
-
-            if (flushTimer !== null) { clearTimeout(flushTimer); flushBuffer(); }
-            allTranslated += chunkParts.join("");
         } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {
                 /* fall through to finally */
@@ -429,17 +467,16 @@ export class TranslationModal extends Modal {
         } finally {
             this.isStreaming = false;
             this.abortController = null;
-            if (flushTimer !== null) { clearTimeout(flushTimer); flushBuffer(); }
-            if (scrollTimer !== null) { clearTimeout(scrollTimer); }
+            if (renderTimer !== null) { clearTimeout(renderTimer); flushRender(); }
 
-            const rawOutput = textNode.data;
-            if (rawOutput) {
-                let result = restoreUrls(rawOutput, urls);
+            // 兜底还原占位符
+            if (this.translatedContent) {
+                let result = restoreUrls(this.translatedContent, urls);
+                result = restoreLatex(result, latex);
+                result = restoreTables(result, tables);
                 result = restoreCodeBlocks(result, codeBlocks);
                 this.translatedContent = result;
             }
-            streamingEl.remove();
-            this.previewRenderEl!.removeClass("ml-tr-hidden");
             this.generateBtn!.setButtonText(t("button.regenerate"));
             this.generateBtn!.buttonEl.removeClass("ml-tr-spinning");
             this.updateGenerateBtnState();
@@ -451,8 +488,9 @@ export class TranslationModal extends Modal {
 
     /**
      * Batch mode: translate multiple chunks concurrently in the background.
-     * No Markdown is rendered during streaming — only per-chunk character counts
-     * are shown so the user knows the model is still alive.
+     * Chunks are greedily sized; if the model truncates output due to max_tokens,
+     * the chunk is automatically split at sentence boundaries and retried.
+     * The UI dynamically updates to show newly spawned sub-chunks.
      */
     private async runBatchTranslation(
         chunks: string[],
@@ -460,102 +498,259 @@ export class TranslationModal extends Modal {
         tgtName: string,
         codeBlocks: string[],
         urls: string[],
+        tables: string[],
+        latex: string[],
     ): Promise<void> {
         if (!this.previewRenderEl || !this.generateBtn) return;
 
-        // Hide the split panel, show the batch status panel
+        // Keep split panel visible so the preview can update in real time.
         const splitEl = this.previewRenderEl.closest(".ml-tr-split") as HTMLElement | null;
-        splitEl?.addClass("ml-tr-hidden");
+        // Insert batch panel before the footer so it sits below the split view.
+        const footer = this.contentEl.querySelector(".ml-tr-footer") as HTMLElement | null;
 
-        const batchPanel = this.contentEl.createDiv("ml-tr-batch-panel");
+        const batchPanelEl = document.createElement("div");
+        batchPanelEl.addClass("ml-tr-batch-panel");
+        const batchPanel = footer
+            ? this.contentEl.insertBefore(batchPanelEl, footer)
+            : this.contentEl.appendChild(batchPanelEl);
         batchPanel.createEl("h3", { text: t("label.batch_translation"), cls: "ml-tr-batch-title" });
         const batchList = batchPanel.createDiv("ml-tr-batch-list");
         const summaryEl = batchPanel.createDiv("ml-tr-batch-summary");
 
-        interface ChunkStatus { chars: number; status: "pending" | "translating" | "done" | "failed"; }
-        const statuses: ChunkStatus[] = chunks.map(() => ({ chars: 0, status: "pending" }));
-        const statusEls: HTMLElement[] = [];
+        interface ChunkStatus { chars: number; status: "pending" | "translating" | "done" | "failed" | "splitting"; }
 
-        for (let i = 0; i < chunks.length; i++) {
-            const row = batchList.createDiv("ml-tr-batch-row");
-            row.createEl("span", { text: t("label.chunk_n_of_total", { current: i + 1, total: chunks.length }), cls: "ml-tr-batch-label" });
-            const statusEl = row.createEl("span", { cls: "ml-tr-batch-status" });
-            statusEls.push(statusEl);
-        }
+        // Mutable arrays — new chunks may be appended when a chunk is truncated.
+        const taskChunks: string[] = [...chunks];
+        const results: (string | null)[] = new Array(chunks.length).fill(null);
+        const statuses: ChunkStatus[] = chunks.map(() => ({ chars: 0, status: "pending" }));
+        // `orders` preserves original document order so split children interleave correctly.
+        const orders: number[] = chunks.map((_, i) => i);
+        const statusEls: HTMLElement[] = [];
+        const retryBtns: HTMLButtonElement[] = [];
 
         const updateUI = (): void => {
+            // Dynamically create UI rows for chunks that were spawned later.
+            while (statusEls.length < statuses.length) {
+                const i = statusEls.length;
+                const row = batchList.createDiv("ml-tr-batch-row");
+                row.createEl("span", { text: t("label.chunk_n_of_total", { current: i + 1, total: taskChunks.length }), cls: "ml-tr-batch-label" });
+                const statusEl = row.createEl("span", { cls: "ml-tr-batch-status" });
+                const retryBtn = row.createEl("button", { text: t("button.retry"), cls: "ml-tr-retry-btn" });
+                retryBtn.addClass("ml-tr-hidden");
+                retryBtn.addEventListener("click", () => { void retryChunk(i); });
+                statusEls.push(statusEl);
+                retryBtns.push(retryBtn);
+            }
+
             const doneCount = statuses.filter(s => s.status === "done").length;
             const totalChars = statuses.reduce((sum, s) => sum + s.chars, 0);
-            for (let i = 0; i < chunks.length; i++) {
+
+            for (let i = 0; i < statuses.length; i++) {
                 const s = statuses[i];
                 const statusText = s.status === "pending" ? t("label.chunk_status_pending")
                     : s.status === "translating" ? `${t("label.chunk_status_translating")} ${s.chars.toLocaleString()}`
+                    : s.status === "splitting" ? `${t("label.chunk_status_splitting")} ${s.chars.toLocaleString()}`
                     : s.status === "done" ? `${t("label.chunk_status_done")} ${s.chars.toLocaleString()}`
                     : `${t("label.chunk_status_failed")} ${s.chars.toLocaleString()}`;
                 statusEls[i].setText(statusText);
                 statusEls[i].setAttribute("data-status", s.status);
+
+                if (s.status === "failed") {
+                    retryBtns[i].removeClass("ml-tr-hidden");
+                } else {
+                    retryBtns[i].addClass("ml-tr-hidden");
+                }
             }
-            summaryEl.setText(t("notice.translate_progress", { done: doneCount, total: chunks.length, chars: totalChars.toLocaleString() }));
+
+            summaryEl.setText(t("notice.translate_progress", { done: doneCount, total: taskChunks.length, chars: totalChars.toLocaleString() }));
         };
         updateUI();
 
-        const results: (string | null)[] = new Array(chunks.length).fill(null);
         const MAX_RETRIES = 3;
         const RETRY_DELAY_MS = 1500;
+        const MAX_SPLIT_DEPTH = 3;
         const concurrency = Math.max(1, Math.min(10, this.plugin.settings.aiConcurrency || 2));
         let nextIndex = 0;
         let abortError: Error | null = null;
 
+        /**
+         * Translates a chunk. If the output is truncated by max_tokens, splits
+         * the chunk at sentence boundaries and recursively translates the first
+         * half while pushing the second half onto the shared task queue.
+         */
+        const translateChunkRecursive = async (
+            text: string,
+            index: number,
+            depth: number,
+            onProgress: (chars: number) => void,
+        ): Promise<string> => {
+            if (depth > MAX_SPLIT_DEPTH) {
+                throw new Error(`Chunk still too large after ${MAX_SPLIT_DEPTH} splits`);
+            }
+
+            let result = "";
+            let retries = 0;
+            let wasTruncated = false;
+
+            while (retries < MAX_RETRIES) {
+                result = "";
+                wasTruncated = false;
+
+                try {
+                    await streamTranslation(
+                        text,
+                        tgtName,
+                        srcName,
+                        this.plugin.settings,
+                        (chunk: string) => {
+                            if (!this.isStreaming) return;
+                            result += chunk;
+                            onProgress(result.length);
+                        },
+                        this.abortController!.signal,
+                        { current: index + 1, total: taskChunks.length },
+                    );
+                    // Success
+                    return result;
+                } catch (err) {
+                    retries++;
+                    if (err instanceof Error && err.name === "AbortError") {
+                        abortError = err;
+                        throw err;
+                    }
+                    const errMsg = err instanceof Error ? err.message : String(err);
+                    if (errMsg.includes("truncated by max_tokens")) {
+                        wasTruncated = true;
+                        break; // Split instead of retrying the same size
+                    }
+                    if (retries >= MAX_RETRIES) {
+                        throw err;
+                    }
+                    await this.sleep(RETRY_DELAY_MS);
+                }
+            }
+
+            if (wasTruncated) {
+                // Split around the half-way point at sentence boundaries.
+                const halfChars = Math.floor(text.length / 2);
+                const halves = sliceAtSentenceBoundaries(text, halfChars);
+
+                // Fallback to hard split if sentence boundaries didn't produce 2 pieces.
+                if (halves.length < 2) {
+                    const mid = Math.floor(text.length / 2);
+                    halves.length = 0;
+                    halves.push(text.slice(0, mid), text.slice(mid));
+                }
+
+                // Show splitting state in the UI.
+                statuses[index] = { chars: result.length, status: "splitting" };
+                updateUI();
+
+                // Recursively translate first half, reusing the current slot.
+                const first = await translateChunkRecursive(halves[0], index, depth + 1, onProgress);
+
+                // Push second half as a new task for the worker pool to pick up.
+                const newIndex = taskChunks.length;
+                taskChunks.push(halves[1]);
+                results.push(null);
+                statuses.push({ chars: 0, status: "pending" });
+                orders.push(orders[index] + 0.001);
+
+                return first;
+            }
+
+            return result;
+        };
+
+        const assembleResult = (): void => {
+            const parts = results
+                .map((result, i) => ({ result, order: orders[i] }))
+                .filter(item => item.result !== null)
+                .sort((a, b) => a.order - b.order)
+                .map(item => item.result!);
+
+            let raw = parts.join("\n\n");
+            raw = restoreUrls(raw, urls);
+            raw = restoreLatex(raw, latex);
+            raw = restoreTables(raw, tables);
+            raw = restoreCodeBlocks(raw, codeBlocks);
+            this.translatedContent = raw;
+        };
+
+        const renderPreview = (): void => {
+            assembleResult();
+            if (this.previewTextArea) this.previewTextArea.value = this.translatedContent;
+            this.renderTranslation();
+            this.updateInsertBtnState();
+            // Scroll preview to bottom to follow latest content.
+            const previewBody = this.previewRenderEl?.closest(".ml-tr-panel-body");
+            if (previewBody) {
+                previewBody.scrollTop = previewBody.scrollHeight;
+            }
+        };
+
+        const retryChunk = async (index: number): Promise<void> => {
+            if (!this.isStreaming || this.abortController?.signal.aborted) return;
+
+            statuses[index] = { chars: 0, status: "translating" };
+            updateUI();
+
+            try {
+                const text = await translateChunkRecursive(
+                    taskChunks[index],
+                    index,
+                    0,
+                    (chars) => {
+                        statuses[index].chars = chars;
+                        updateUI();
+                    },
+                );
+                results[index] = text;
+                statuses[index].chars = text.length;
+                statuses[index].status = "done";
+            } catch (err) {
+                if (err instanceof Error && err.name === "AbortError") return;
+                results[index] = `\n\n[${t("notice.translate_chunk_failed", { current: index + 1, total: taskChunks.length })}]\n\n`;
+                statuses[index].status = "failed";
+            }
+
+            updateUI();
+            renderPreview();
+        };
+
         const worker = async (): Promise<void> => {
-            while (nextIndex < chunks.length) {
+            while (nextIndex < taskChunks.length) {
                 const i = nextIndex++;
                 if (this.abortController?.signal.aborted) return;
 
                 statuses[i] = { chars: 0, status: "translating" };
                 updateUI();
 
-                const chunkParts: string[] = [];
-                let retries = 0;
-                let succeeded = false;
-
-                while (retries < MAX_RETRIES && !succeeded) {
-                    try {
-                        chunkParts.length = 0;
-                        await streamTranslation(
-                            chunks[i],
-                            tgtName,
-                            srcName,
-                            this.plugin.settings,
-                            (chunk: string) => {
-                                if (!this.isStreaming) return;
-                                chunkParts.push(chunk);
-                                statuses[i].chars = chunkParts.join("").length;
-                                updateUI();
-                            },
-                            this.abortController!.signal,
-                            { current: i + 1, total: chunks.length },
-                        );
-                        succeeded = true;
-                    } catch (err) {
-                        retries++;
-                        if (err instanceof Error && err.name === "AbortError") {
-                            abortError = err;
-                            return;
-                        }
-                        if (retries >= MAX_RETRIES) {
-                            const failedMarker = `\n\n[${t("notice.translate_chunk_failed", { current: i + 1, total: chunks.length })}]\n\n`;
-                            chunkParts.length = 0;
-                            chunkParts.push(failedMarker);
-                            break;
-                        }
-                        await this.sleep(RETRY_DELAY_MS);
+                try {
+                    const text = await translateChunkRecursive(
+                        taskChunks[i],
+                        i,
+                        0,
+                        (chars) => {
+                            statuses[i].chars = chars;
+                            updateUI();
+                        },
+                    );
+                    results[i] = text;
+                    statuses[i].chars = text.length;
+                    statuses[i].status = "done";
+                } catch (err) {
+                    if (err instanceof Error && err.name === "AbortError") {
+                        abortError = err;
+                        return;
                     }
+                    results[i] = `\n\n[${t("notice.translate_chunk_failed", { current: i + 1, total: taskChunks.length })}]\n\n`;
+                    statuses[i].status = "failed";
                 }
 
-                results[i] = chunkParts.join("");
-                statuses[i].chars = results[i]!.length;
-                statuses[i].status = succeeded ? "done" : "failed";
                 updateUI();
+                // 实时渲染已完成的 chunk，让用户跟随最新流
+                renderPreview();
             }
         };
 
@@ -565,15 +760,7 @@ export class TranslationModal extends Modal {
 
             if (abortError) return; // user cancelled — partial output handled in finally
 
-            // Join results with double-newlines between successful chunks
-            const parts: string[] = [];
-            for (let i = 0; i < results.length; i++) {
-                if (results[i] !== null) parts.push(results[i]!);
-            }
-            let raw = parts.join("\n\n");
-            raw = restoreUrls(raw, urls);
-            raw = restoreCodeBlocks(raw, codeBlocks);
-            this.translatedContent = raw;
+            assembleResult();
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             new Notice(`Error: ${msg}`);

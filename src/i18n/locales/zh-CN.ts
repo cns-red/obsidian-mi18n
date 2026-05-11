@@ -153,6 +153,7 @@ const zhCN: MessagesShape = {
     translating: "翻译中...",
     translating_chunk: "翻译中... ({current}/{total})",
     regenerate: "重新生成",
+    retry: "重试",
   },
   label: {
     preview_edit: "预览与编辑",
@@ -162,6 +163,7 @@ const zhCN: MessagesShape = {
     chunk_n_of_total: "第 {current}/{total} 段",
     chunk_status_pending: "等待中...",
     chunk_status_translating: "翻译中...",
+    chunk_status_splitting: "拆分重试中...",
     chunk_status_done: "完成",
     chunk_status_failed: "失败",
   },
