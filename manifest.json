@@ -1,7 +1,7 @@
 {
-  "id": "internationalization",
-  "name": "Internationalization",
-  "version": "1.3.2",
+  "id": "mi18n",
+  "name": "mi18n",
+  "version": "1.3.3",
   "minAppVersion": "1.4.0",
   "description": "Internationalization for Markdown. Write multiple languages in a single note, then switch the visible language globally.",
   "author": "J.K.",
